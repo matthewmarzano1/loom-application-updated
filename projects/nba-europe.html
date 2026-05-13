@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NBA Europe — A Strategic Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,700;9..144,900&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root {
+  --ink: #0a0a0a;
+  --paper: #f5f1ea;
+  --paper-dim: #ede7dc;
+  --accent: #c8102e;       /* NBA red */
+  --accent-deep: #1d1160;  /* NBA blue */
+  --accent-warm: #e8a317;
+  --rule: #1a1a1a;
+  --muted: #6b6256;
+  --grid: rgba(10,10,10,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter Tight', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* === Texture overlay === */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  opacity: 0.08;
+  mix-blend-mode: multiply;
+  z-index: 1;
+}
+
+main { position: relative; z-index: 2; }
+
+/* === MASTHEAD === */
+.masthead {
+  border-bottom: 3px solid var(--ink);
+  padding: 1.2rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.masthead .left { display: flex; gap: 2rem; }
+.masthead .vol { color: var(--muted); }
+.masthead .issue { color: var(--accent); font-weight: 700; }
+
+/* === HERO === */
+.hero {
+  padding: 4rem 2rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--rule);
+}
+
+.hero-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 32px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.hero h1 {
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(3.5rem, 9vw, 8rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  margin-bottom: 2rem;
+  font-variation-settings: 'opsz' 144;
+}
+.hero h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.hero-deck {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+  font-weight: 300;
+  font-style: italic;
+  max-width: 780px;
+  color: var(--ink);
+  line-height: 1.4;
+  margin-bottom: 3rem;
+}
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+}
+.byline strong { color: var(--ink); font-weight: 700; }
+
+/* === SECTION === */
+section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 5rem 2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.section-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.section-num::before {
+  content: '';
+  display: inline-block;
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.section-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 2rem;
+  max-width: 900px;
+}
+.section-title em { font-style: italic; color: var(--accent); }
+
+.lede {
+  font-family: 'Fraunces', serif;
+  font-size: 1.35rem;
+  font-weight: 300;
+  line-height: 1.5;
+  max-width: 720px;
+  color: var(--ink);
+  margin-bottom: 3rem;
+}
+.lede::first-letter {
+  font-weight: 700;
+  font-style: italic;
+}
+
+.body-text {
+  max-width: 680px;
+  font-size: 1.05rem;
+  color: var(--ink);
+  line-height: 1.7;
+}
+.body-text p { margin-bottom: 1.4rem; }
+.body-text p:last-child { margin-bottom: 0; }
+.body-text strong { font-weight: 600; }
+
+/* === STAT BLOCKS === */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0;
+  margin: 3rem 0;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.stat {
+  padding: 1.8rem 1.2rem;
+  border-right: 1px solid var(--rule);
+  position: relative;
+}
+.stat:last-child { border-right: none; }
+.stat-num {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: clamp(2.5rem, 4.5vw, 3.8rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  margin-bottom: 0.4rem;
+}
+.stat-num em { color: var(--accent); font-style: normal; }
+.stat-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* === HEATMAP === */
+.heatmap-wrapper {
+  background: var(--paper-dim);
+  border: 2px solid var(--ink);
+  padding: 2.5rem;
+  margin: 3rem 0;
+  position: relative;
+}
+.heatmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.heatmap-title {
+  font-family: 'Fraunces', serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.heatmap-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 0.4rem;
+}
+
+.metric-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.metric-btn {
+  background: transparent;
+  border: 1px solid var(--ink);
+  padding: 0.5rem 0.9rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--ink);
+}
+.metric-btn:hover { background: var(--ink); color: var(--paper); }
+.metric-btn.active {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+
+#map-container {
+  width: 100%;
+  height: 600px;
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+#map-container svg { width: 100%; height: 100%; display: block; }
+
+.country-path {
+  stroke: var(--ink);
+  stroke-width: 0.5;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.country-path:hover { opacity: 0.75; stroke-width: 1.2; }
+
+.tooltip {
+  position: absolute;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.9rem 1.1rem;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 0.85rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  max-width: 240px;
+  z-index: 100;
+  border-left: 3px solid var(--accent);
+}
+.tooltip.show { opacity: 1; }
+.tooltip-name {
+  font-family: 'Fraunces', serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.6rem;
+  letter-spacing: -0.01em;
+}
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.78rem;
+  margin-bottom: 0.3rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+.tooltip-row span:first-child { color: rgba(245,241,234,0.6); }
+.tooltip-score {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(245,241,234,0.2);
+  font-family: 'Fraunces', serif;
+  font-size: 1rem;
+}
+
+.legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.legend-bar {
+  display: flex;
+  height: 18px;
+  flex: 1;
+  min-width: 280px;
+  border: 1px solid var(--ink);
+}
+.legend-step { flex: 1; }
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 0.4rem;
+}
+
+/* === CITY OPPORTUNITY === */
+.cities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0;
+  margin-top: 2rem;
+  border-top: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+}
+.city-card {
+  background: var(--paper);
+  padding: 1.8rem 1.5rem;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+  transition: background 0.2s;
+}
+.city-card:hover { background: var(--paper-dim); }
+.city-card.tier-1 { border-left: 3px solid var(--accent); }
+.city-card.tier-2 { border-left: 3px solid var(--accent-warm); }
+.city-card.tier-3 { border-left: 3px solid var(--muted); }
+
+.city-rank {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.city-name {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.2rem;
+  line-height: 1;
+}
+.city-country {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+}
+.city-meta {
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.5;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+.city-meta strong { font-weight: 600; }
+.city-status {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  background: var(--ink);
+  color: var(--paper);
+  margin-bottom: 1rem;
+}
+.city-status.proposed { background: var(--accent); }
+.city-status.existing { background: var(--accent-deep); }
+
+/* === PULL QUOTE === */
+.pull-quote {
+  margin: 4rem auto;
+  max-width: 920px;
+  padding: 3rem 0;
+  text-align: center;
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  position: relative;
+}
+.pull-quote::before {
+  content: '"';
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 8rem;
+  line-height: 0.8;
+  color: var(--accent);
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.15;
+}
+.pull-quote blockquote {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  position: relative;
+}
+.pull-quote cite {
+  display: block;
+  margin-top: 1.5rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-style: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* === STRATEGY GRID === */
+.strategy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 2rem;
+  border: 2px solid var(--ink);
+}
+.strategy-cell {
+  padding: 2rem;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+.strategy-cell:nth-child(even) { border-right: none; }
+.strategy-cell:nth-last-child(-n+2) { border-bottom: none; }
+.strategy-cell h4 {
+  font-family: 'Fraunces', serif;
+  font-size: 1.3rem;
+  font-weight: 500;
+  margin-bottom: 0.8rem;
+  letter-spacing: -0.01em;
+}
+.strategy-cell .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+.strategy-cell p { font-size: 0.95rem; line-height: 1.55; }
+
+/* === RECOMMENDATIONS === */
+.rec-list {
+  margin-top: 2rem;
+  counter-reset: rec;
+}
+.rec-item {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 2rem;
+  padding: 2.2rem 0;
+  border-top: 1px solid var(--rule);
+  align-items: start;
+}
+.rec-item:last-child { border-bottom: 1px solid var(--rule); }
+.rec-item::before {
+  counter-increment: rec;
+  content: counter(rec, decimal-leading-zero);
+  font-family: 'Fraunces', serif;
+  font-size: 3rem;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--accent);
+  font-variation-settings: 'opsz' 144;
+}
+.rec-content h4 {
+  font-family: 'Fraunces', serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+.rec-content .lean {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.8rem;
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--accent);
+}
+.rec-content p { font-size: 1rem; line-height: 1.65; max-width: 640px; }
+
+/* === RISK MATRIX === */
+.risk-matrix {
+  margin-top: 2rem;
+  background: var(--paper-dim);
+  border: 2px solid var(--ink);
+  padding: 2rem;
+  position: relative;
+}
+.risk-grid {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr;
+  gap: 0;
+  margin-top: 1rem;
+}
+.risk-grid > div {
+  padding: 1rem 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+}
+.risk-grid > div:nth-child(4n) { border-right: none; }
+.risk-grid > .head {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 0.8rem;
+}
+.risk-grid > .risk-name {
+  font-family: 'Fraunces', serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.risk-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  display: inline-block;
+}
+.risk-high { background: var(--accent); color: var(--paper); }
+.risk-med { background: var(--accent-warm); color: var(--ink); }
+.risk-low { background: var(--accent-deep); color: var(--paper); }
+
+/* === GLOBAL CONTEXT VIZ === */
+.global-context {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 2rem;
+  border: 2px solid var(--ink);
+}
+.context-half {
+  padding: 2.5rem 2rem;
+  border-right: 1px solid var(--rule);
+}
+.context-half:last-child { border-right: none; }
+.context-half h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.context-half h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 1.5rem;
+}
+.context-half p { font-size: 0.95rem; line-height: 1.6; }
+
+/* === KICKER === */
+.kicker {
+  text-align: center;
+  padding: 6rem 2rem;
+  background: var(--ink);
+  color: var(--paper);
+  position: relative;
+}
+.kicker::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  opacity: 0.15;
+  mix-blend-mode: screen;
+}
+.kicker > * { position: relative; z-index: 2; }
+.kicker .section-num { color: var(--accent-warm); }
+.kicker .section-num::before { background: var(--accent-warm); }
+.kicker h2 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  max-width: 900px;
+  margin: 0 auto 2rem;
+}
+.kicker h2 em { color: var(--accent-warm); }
+.kicker p {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 1.3rem;
+  font-weight: 300;
+  max-width: 720px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* === FOOTER === */
+footer {
+  padding: 3rem 2rem;
+  background: var(--ink);
+  color: var(--paper);
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-top: 1px solid rgba(245,241,234,0.1);
+}
+footer p { margin-bottom: 0.5rem; }
+footer .small { font-size: 0.65rem; opacity: 0.6; }
+
+/* === ANIMATIONS === */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.hero h1, .hero-deck, .byline { animation: fade-up 0.9s ease-out both; }
+.hero-deck { animation-delay: 0.15s; }
+.byline { animation-delay: 0.3s; }
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .strategy-grid { grid-template-columns: 1fr; }
+  .strategy-cell { border-right: none !important; }
+  .global-context { grid-template-columns: 1fr; }
+  .context-half { border-right: none; border-bottom: 1px solid var(--rule); }
+  .rec-item { grid-template-columns: 1fr; gap: 0.5rem; }
+  #map-container { height: 450px; }
+  .risk-grid { grid-template-columns: 1fr; }
+  .risk-grid > div { border-right: none; }
+  .risk-grid > .head { display: none; }
+  .risk-grid > div::before {
+    content: attr(data-label);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+}
+</style>
+</head>
+<body>
+
+<main>
+
+<!-- MASTHEAD -->
+<header class="masthead">
+  <div class="left">
+    <span class="issue">NBA Europe Analysis</span>
+  </div>
+  <div class="right">May 2026</div>
+</header>
+
+<!-- HERO -->
+<section class="hero" style="border-bottom: 3px solid var(--ink);">
+  <div class="hero-eyebrow">Sport · Strategy · Globalization</div>
+  <h1>The League Without <em>Borders.</em></h1>
+  <p class="hero-deck">A strategic analysis of the NBA's most ambitious international play in three decades — the launch of NBA Europe in 2027, the $5 billion bet behind it, and what it means for the future of basketball as a global product.</p>
+  <div class="byline">
+    <span><strong>Independent Strategic Brief</strong></span>
+    <span>Audience · Industry &amp; League Office</span>
+    <span>Reading time · 12 min</span>
+  </div>
+</section>
+
+<!-- SECTION 1: WHAT -->
+<section id="what">
+  <div class="section-num">§ 01 — The Play</div>
+  <h2 class="section-title">What the NBA <em>is actually</em> trying to accomplish.</h2>
+  <p class="lede">In December 2025, the NBA and FIBA jointly announced the formation of a new pan-European men's basketball league — a venture targeting a fall 2027 launch with sixteen teams across Europe's largest cities. This is not an experiment in international games. It is the construction of a permanent second league, structurally distinct from the 30-team NBA, governed jointly by both organizations.</p>
+
+  <div class="body-text">
+    <p>The structure is unprecedented for the NBA. Twelve permanent franchise teams will anchor the league, with four additional spots earned through performance in FIBA-affiliated domestic leagues — a hybrid of American closed-league economics and European promotion-relegation tradition. Investors have been quoted ownership stakes between $300M and $1B per team, with sovereign wealth funds, private equity firms, and existing European basketball and soccer clubs all in active conversation.</p>
+
+    <p>The mechanics matter because they reveal the strategic intent. The NBA owns 50% of the new league; team owners own the other 50% — identical to the original WNBA equity structure. Schedule alignment with FIBA national-team windows is core to the design. The league will respect European on-court traditions while importing NBA-grade production, broadcast standards, and commercial infrastructure.</p>
+
+    <p>Read it correctly: this is not the NBA exporting basketball to Europe. It is the NBA <strong>institutionalizing</strong> the European basketball ecosystem under its own commercial architecture — a category move, not a marketing move.</p>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-num"><em>16</em></div>
+      <div class="stat-label">Target Teams<br/>at Launch</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">$<em>5</em>B</div>
+      <div class="stat-label">Estimated Total<br/>Expansion Fees</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num"><em>120</em>+</div>
+      <div class="stat-label">Prospective<br/>Investors Engaged</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">'<em>27</em></div>
+      <div class="stat-label">Targeted<br/>Launch Year</div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 2: WHY -->
+<section id="why">
+  <div class="section-num">§ 02 — The Opportunity</div>
+  <h2 class="section-title">Why <em>Europe,</em> and why now.</h2>
+  <p class="lede">The market case for NBA Europe is not that Europeans are about to discover basketball. They already have. The case is that Europe's basketball ecosystem is structurally underbuilt relative to the talent it produces and the demand it generates. A modern, financialized, properly scheduled top league is missing — and the NBA is the only operator with the capital, brand equity, and league-design expertise to build it.</p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-num"><em>71</em></div>
+      <div class="stat-label">European Players<br/>on NBA Rosters '25-26</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num"><em>5</em>/6</div>
+      <div class="stat-label">Last MVP Awards<br/>Won by Europeans</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num"><em>3</em>M+</div>
+      <div class="stat-label">EuroLeague Annual<br/>Attendance ('24-25)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">270M</div>
+      <div class="stat-label">Self-Identified<br/>Basketball Fans in EU</div>
+    </div>
+  </div>
+
+  <!-- HEATMAP -->
+  <div class="heatmap-wrapper">
+    <div class="heatmap-header">
+      <div>
+        <div class="heatmap-title">European Opportunity Index</div>
+        <div class="heatmap-sub">Composite score · By country · Toggle metrics</div>
+      </div>
+      <div class="metric-toggles">
+        <button class="metric-btn active" data-metric="composite">Composite</button>
+        <button class="metric-btn" data-metric="fans">Fan Base</button>
+        <button class="metric-btn" data-metric="viewership">Viewership</button>
+        <button class="metric-btn" data-metric="attendance">Pro League</button>
+        <button class="metric-btn" data-metric="players">NBA Players</button>
+      </div>
+    </div>
+    <div id="map-container">
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <div class="legend">
+      <div>
+        <div class="legend-bar" id="legend-bar"></div>
+        <div class="legend-labels">
+          <span>Lower opportunity</span>
+          <span>Higher opportunity</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body-text">
+    <p>The composite reveals what raw fan-count rankings miss. <strong>France, Germany, Spain, Italy, and the United Kingdom</strong> represent the largest absolute commercial markets. But the highest <em>per-capita</em> intensity sits in Lithuania, Greece, Serbia, and Slovenia — the basketball-first cultures producing world-class talent on populations under 11 million.</p>
+    <p>The NBA's targeting reflects this dual-axis math. Tier-1 expansion cities concentrate in Europe's commercial capitals where basketball is demonstrably under-served — London, Berlin, Paris, Rome, Manchester. The strategy is not to plant flags in cultural strongholds; it is to build top-tier basketball infrastructure where commercial scale exists but a serious league does not.</p>
+  </div>
+
+  <div class="pull-quote">
+    <blockquote>
+      We have 270 million fans in Europe and basketball has become their second-most-popular sport. We're just scratching the surface in terms of growth potential.
+    </blockquote>
+    <cite>Leah MacNab — SVP, Head of International Strategy, NBA</cite>
+  </div>
+
+  <h3 style="font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 400; letter-spacing: -0.02em; margin: 4rem 0 1.5rem;">The Twelve Cities <em style="color: var(--accent);">in Play.</em></h3>
+  <div class="cities-grid" id="cities-grid"></div>
+</section>
+
+<!-- SECTION 3: HOW + RECOMMENDATIONS -->
+<section id="how">
+  <div class="section-num">§ 03 — Execution &amp; Recommendations</div>
+  <h2 class="section-title">How they're doing it — and where the <em>strategy</em> can be sharpened.</h2>
+  <p class="lede">The NBA's playbook is logical: secure capital, lock in core franchises, negotiate or neutralize the EuroLeague, calibrate around FIBA's national-team calendar, and launch in fall 2027. The execution risk is less about whether the league launches and more about whether it launches as a category-defining product or merely a competitor to an entrenched incumbent.</p>
+
+  <div class="strategy-grid">
+    <div class="strategy-cell">
+      <div class="label">Pillar 01</div>
+      <h4>Capital Architecture</h4>
+      <p>Twelve permanent licenses sold at $300M–$1B+, with the NBA retaining 50% league equity. JP Morgan Chase and the Raine Group are advising. Investor pool spans sovereign wealth, private equity, and existing club operators (Real Madrid, Bayern Munich, PSG, Manchester City).</p>
+    </div>
+    <div class="strategy-cell">
+      <div class="label">Pillar 02</div>
+      <h4>EuroLeague Resolution</h4>
+      <p>The dominant existing competition is privately controlled and structurally hostile. Path forward is either negotiated convergence (preferred — EuroLeague hired conciliatory new CEO Chus Bueno in March 2026) or controlled displacement of EuroLeague clubs into the new structure.</p>
+    </div>
+    <div class="strategy-cell">
+      <div class="label">Pillar 03</div>
+      <h4>City Strategy</h4>
+      <p>Anchor in commercial capitals lacking a top-tier club (London, Berlin, Rome, Manchester). Accept a basketball-cultural premium where required (Madrid, Athens, Belgrade) by acquiring or partnering with incumbent clubs. Multi-club ownership questions remain unresolved.</p>
+    </div>
+    <div class="strategy-cell">
+      <div class="label">Pillar 04</div>
+      <h4>Calendar &amp; Pathway</h4>
+      <p>Schedule alignment with FIBA national-team windows is non-negotiable — the value proposition to European stars depends on club-and-country compatibility. Promotion pathway via four open spots maintains domestic-league relevance and European fan tradition.</p>
+    </div>
+  </div>
+
+  <h3 style="font-family: 'Fraunces', serif; font-size: 2.2rem; font-weight: 400; letter-spacing: -0.02em; margin: 5rem 0 1rem; max-width: 900px;">Five recommendations for the league office.</h3>
+  <p style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 2rem;">Independent — directional — written for the working team.</p>
+
+  <div class="rec-list">
+    <div class="rec-item">
+      <div class="rec-content">
+        <span class="lean">Lean — Negotiate, don't displace</span>
+        <h4>Treat EuroLeague resolution as the gating decision, not a parallel workstream.</h4>
+        <p>The single largest determinant of NBA Europe's launch quality is whether marquee EuroLeague clubs (Real Madrid, Olympiacos, Panathinaikos, Fenerbahçe) join voluntarily or arrive bruised. Every quarter spent in legal posture is a quarter the launch product depreciates. A negotiated framework — even at the cost of share economics — produces a stronger league than a clean break with litigated migrations.</p>
+      </div>
+    </div>
+    <div class="rec-item">
+      <div class="rec-content">
+        <span class="lean">Lean — Build infrastructure, not just franchises</span>
+        <h4>Co-invest in arena and broadcast infrastructure in non-traditional cities.</h4>
+        <p>London, Berlin, Manchester, and Rome do not have basketball arenas built to NBA production standards. Selling a $500M franchise into a city without proper venue and broadcast infrastructure is the WNBA-Toronto problem at much larger scale. League-led co-investment in arena buildouts and broadcast facilities — even at margin cost — protects launch quality and gives the league leverage in subsequent media rights negotiations.</p>
+      </div>
+    </div>
+    <div class="rec-item">
+      <div class="rec-content">
+        <span class="lean">Lean — Lead with the schedule</span>
+        <h4>Make club-and-country calendar alignment the marketing centerpiece, not a footnote.</h4>
+        <p>The single most under-leveraged differentiator versus the EuroLeague status quo is fixing the player-availability problem. European fans already know the talent. They don't always get to watch them at full intensity. Position NBA Europe publicly as "the league that finally lets you see Wembanyama in club AND country" — a tangible, emotional value proposition that EuroLeague structurally cannot match.</p>
+      </div>
+    </div>
+    <div class="rec-item">
+      <div class="rec-content">
+        <span class="lean">Lean — Invest in the youth pipeline now</span>
+        <h4>Localize the development infrastructure: Junior NBA Europe, NBA Academies, BWB at scale.</h4>
+        <p>The NBA's long-term moat is the talent pipeline, not the broadcast. Europe already produces 71 NBA-roster players with no formal NBA-led development pipeline. Launching NBA Academy Europe ahead of league kickoff — co-located with anchor franchise cities — does double duty: it produces the talent the league will need by 2030, and it gives anchor franchises a tangible community footprint from day one.</p>
+      </div>
+    </div>
+    <div class="rec-item">
+      <div class="rec-content">
+        <span class="lean">Lean — Resist the temptation to over-Americanize</span>
+        <h4>Preserve European basketball identity in product, branding, and rule choices.</h4>
+        <p>FIBA rules, European refereeing standards, ultras-style fan culture, club crests over corporate marks — these are the things that make European basketball <em>European</em>. The NBA's brand strength is high; its temptation to standardize is higher. The most durable version of NBA Europe is the one fans in Belgrade, Madrid, and Athens recognize as theirs. Lean toward European convention on the product, lean toward NBA convention on the commercial layer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 4: RISKS -->
+<section id="risks">
+  <div class="section-num">§ 04 — Risk Assessment</div>
+  <h2 class="section-title">What could <em>break</em> the launch.</h2>
+  <p class="lede">A new top-tier league launching across nine-plus countries, with mixed currencies, disparate broadcast markets, an entrenched competitor, and a parent league three thousand miles away has many failure modes. Below are the risks most likely to materially impair launch — ranked by probability and impact.</p>
+
+  <div class="risk-matrix">
+    <div class="risk-grid">
+      <div class="head" style="grid-column: 1 / 2;">#</div>
+      <div class="head">Risk</div>
+      <div class="head">Probability</div>
+      <div class="head">Impact</div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">01</div>
+      <div class="risk-name" data-label="Risk">EuroLeague legal action &amp; club lock-in</div>
+      <div data-label="Probability"><span class="risk-pill risk-high">High</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-high">Severe</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">02</div>
+      <div class="risk-name" data-label="Risk">Arena &amp; broadcast infrastructure gaps in launch cities</div>
+      <div data-label="Probability"><span class="risk-pill risk-high">High</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-med">High</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">03</div>
+      <div class="risk-name" data-label="Risk">FIBA scheduling conflicts &amp; player availability</div>
+      <div data-label="Probability"><span class="risk-pill risk-med">Moderate</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-high">Severe</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">04</div>
+      <div class="risk-name" data-label="Risk">Multi-club ownership &amp; competitive balance</div>
+      <div data-label="Probability"><span class="risk-pill risk-med">Moderate</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-med">High</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">05</div>
+      <div class="risk-name" data-label="Risk">Macroeconomic / FX impact on franchise valuations</div>
+      <div data-label="Probability"><span class="risk-pill risk-med">Moderate</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-med">High</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">06</div>
+      <div class="risk-name" data-label="Risk">Cultural backlash to perceived American takeover</div>
+      <div data-label="Probability"><span class="risk-pill risk-med">Moderate</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-med">High</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">07</div>
+      <div class="risk-name" data-label="Risk">Owner attention dilution from parallel US expansion</div>
+      <div data-label="Probability"><span class="risk-pill risk-low">Low</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-med">High</span></div>
+
+      <div data-label="#" style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">08</div>
+      <div class="risk-name" data-label="Risk">Geopolitical disruption (Russia, Israel, Türkiye)</div>
+      <div data-label="Probability"><span class="risk-pill risk-low">Low</span></div>
+      <div data-label="Impact"><span class="risk-pill risk-high">Severe</span></div>
+    </div>
+  </div>
+
+  <div class="body-text" style="margin-top: 3rem;">
+    <p><strong>The decisive risk is #1.</strong> If marquee EuroLeague clubs do not join — voluntarily or via litigated migration — NBA Europe launches as a structurally inferior product to its incumbent rival. Every other risk is manageable with capital and time. The EuroLeague risk is the only one that compounds with delay.</p>
+    <p>Conversely: <strong>Risk #3 is the one most often underrated.</strong> The schedule alignment with FIBA windows is the league's single largest differentiator. If the calendar fails — if NBA Europe launches with the same player-availability conflicts that plague the EuroLeague today — the league loses its central narrative advantage on day one.</p>
+  </div>
+</section>
+
+<!-- SECTION 5: GLOBALIZING -->
+<section id="globalizing">
+  <div class="section-num">§ 05 — The Bigger Pattern</div>
+  <h2 class="section-title">What this means for <em>basketball</em> as a global product.</h2>
+  <p class="lede">NBA Europe is not a self-contained project. It is the second pin in a three-pin globalization strategy — anchored in Africa with the Basketball Africa League since 2021, extending now to Europe in 2027, and (almost certainly) to Asia by the early 2030s. Read together, these are the moves of a league that has decided basketball will be globalized as a category, and intends to be the operator that does the globalizing.</p>
+
+  <div class="global-context">
+    <div class="context-half">
+      <h4>Precedent — BAL · 2021</h4>
+      <h3>Africa as proof of concept.</h3>
+      <p>The Basketball Africa League was the NBA's first co-developed international league venture. Twelve teams. Joint venture with FIBA. Six-year track record of operational learnings — broadcast logistics, multi-currency commercial models, FIBA partnership mechanics — all of which now feed directly into the European playbook. NBA Europe is BAL at 10x scale, with familiar architecture.</p>
+    </div>
+    <div class="context-half">
+      <h4>Forward — Asia · TBD</h4>
+      <h3>Where the next pin lands.</h3>
+      <p>52% of internet adults in China watch the NBA — the highest viewership of any major market globally. The geopolitical complexity of a China-NBA league venture currently exceeds even the EuroLeague tension. But the commercial logic is overwhelming. The most likely path: a Pan-Asian or Southeast-Asia-anchored league post-2030, leveraging the operational template proven in Africa and refined in Europe.</p>
+    </div>
+  </div>
+
+  <div class="body-text" style="margin-top: 4rem;">
+    <p>Read the trajectory carefully. The NBA is not exporting itself. It is constructing a layered global pyramid in which the original 30-team NBA sits at the apex, regional leagues operate as tier-1 affiliates with shared commercial DNA, and a unified global pipeline of talent, fans, and capital flows between them. The Champions League model — but for basketball, and operated end-to-end by a single league architect.</p>
+    <p>If NBA Europe launches successfully in 2027, the precedent is set. If it launches poorly, every subsequent international venture inherits the doubt. The stakes — for basketball as a global sport, and for the NBA's identity over the next twenty years — sit almost entirely on this launch.</p>
+  </div>
+</section>
+
+<!-- KICKER -->
+<section class="kicker">
+  <div class="section-num">§ 06 — In Closing</div>
+  <h2>The next era of basketball will be <em>built,</em> not exported.</h2>
+  <p>The question isn't whether the NBA can take basketball to the world. The question is whether it can build the architecture the world needs to receive it. Europe is the test case.</p>
+</section>
+
+<footer>
+  <p>Independent Strategic Brief · Compiled May 2026</p>
+  <p class="small">Sources · NBA Communications, EuroLeague Basketball, FIBA, Sportico, Boardroom, S&amp;P Global Market Intelligence, Statista, public reporting.</p>
+</footer>
+
+</main>
+iofrdjowejs
+<script>
+// =============================
+// DATA — opportunity by country
+// =============================
+// Each metric on 0–100 scale.
+// composite = weighted blend (fans 30%, viewership 25%, attendance 25%, players 20%)
+const countryData = {
+  "France":         { fans: 78, viewership: 75, attendance: 70, players: 100, composite: 81 },
+  "Germany":        { fans: 72, viewership: 70, attendance: 75, players: 60,  composite: 70 },
+  "Spain":          { fans: 88, viewership: 82, attendance: 90, players: 35,  composite: 76 },
+  "Italy":          { fans: 70, viewership: 68, attendance: 65, players: 25,  composite: 60 },
+  "United Kingdom": { fans: 50, viewership: 45, attendance: 25, players: 20,  composite: 38 },
+  "Greece":         { fans: 95, viewership: 88, attendance: 92, players: 15,  composite: 75 },
+  "Serbia":         { fans: 100,viewership: 92, attendance: 95, players: 60,  composite: 87 },
+  "Lithuania":      { fans: 100,viewership: 90, attendance: 100,players: 25,  composite: 80 },
+  "Slovenia":       { fans: 90, viewership: 85, attendance: 70, players: 20,  composite: 67 },
+  "Croatia":        { fans: 82, viewership: 75, attendance: 60, players: 30,  composite: 64 },
+  "Türkiye":        { fans: 85, viewership: 78, attendance: 88, players: 25,  composite: 71 },
+  "Poland":         { fans: 55, viewership: 50, attendance: 45, players: 15,  composite: 43 },
+  "Belgium":        { fans: 45, viewership: 50, attendance: 35, players: 15,  composite: 37 },
+  "Netherlands":    { fans: 42, viewership: 48, attendance: 30, players: 15,  composite: 34 },
+  "Switzerland":    { fans: 40, viewership: 45, attendance: 30, players: 5,   composite: 31 },
+  "Austria":        { fans: 38, viewership: 42, attendance: 28, players: 5,   composite: 28 },
+  "Sweden":         { fans: 30, viewership: 35, attendance: 25, players: 5,   composite: 24 },
+  "Norway":         { fans: 25, viewership: 30, attendance: 20, players: 0,   composite: 19 },
+  "Finland":        { fans: 38, viewership: 40, attendance: 35, players: 10,  composite: 31 },
+  "Denmark":        { fans: 28, viewership: 32, attendance: 22, players: 5,   composite: 22 },
+  "Portugal":       { fans: 38, viewership: 38, attendance: 30, players: 5,   composite: 28 },
+  "Ireland":        { fans: 35, viewership: 38, attendance: 22, players: 0,   composite: 25 },
+  "Czechia":        { fans: 50, viewership: 50, attendance: 45, players: 10,  composite: 39 },
+  "Hungary":        { fans: 42, viewership: 45, attendance: 35, players: 5,   composite: 32 },
+  "Romania":        { fans: 40, viewership: 38, attendance: 30, players: 5,   composite: 28 },
+  "Bulgaria":       { fans: 38, viewership: 40, attendance: 30, players: 5,   composite: 28 },
+  "Bosnia and Herz.":{ fans: 75, viewership: 70, attendance: 55, players: 20, composite: 56 },
+  "Montenegro":     { fans: 80, viewership: 75, attendance: 60, players: 25,  composite: 60 },
+  "Albania":        { fans: 30, viewership: 32, attendance: 20, players: 0,   composite: 21 },
+  "North Macedonia":{ fans: 60, viewership: 55, attendance: 40, players: 5,   composite: 41 },
+  "Latvia":         { fans: 75, viewership: 70, attendance: 65, players: 15,  composite: 57 },
+  "Estonia":        { fans: 60, viewership: 55, attendance: 45, players: 5,   composite: 41 },
+  "Iceland":        { fans: 25, viewership: 30, attendance: 18, players: 0,   composite: 18 },
+  "Slovakia":       { fans: 35, viewership: 38, attendance: 28, players: 5,   composite: 27 },
+  "Cyprus":         { fans: 38, viewership: 40, attendance: 28, players: 0,   composite: 27 },
+  "Luxembourg":     { fans: 28, viewership: 32, attendance: 18, players: 0,   composite: 20 },
+  "Malta":          { fans: 22, viewership: 28, attendance: 15, players: 0,   composite: 17 },
+  "Russia":         { fans: 65, viewership: 62, attendance: 70, players: 25,  composite: 56 },
+  "Ukraine":        { fans: 40, viewership: 42, attendance: 35, players: 8,   composite: 31 },
+  "Belarus":        { fans: 30, viewership: 32, attendance: 25, players: 5,   composite: 23 },
+  "Moldova":        { fans: 22, viewership: 25, attendance: 18, players: 0,   composite: 16 },
+  "Kosovo":         { fans: 50, viewership: 50, attendance: 35, players: 0,   composite: 34 },
+  "Georgia":        { fans: 70, viewership: 65, attendance: 50, players: 30,  composite: 56 },
+  "Armenia":        { fans: 28, viewership: 30, attendance: 22, players: 0,   composite: 20 },
+  "Azerbaijan":     { fans: 25, viewership: 28, attendance: 20, players: 0,   composite: 19 }
+};
+
+// Map common name aliases used in topojson to our keys
+const aliasMap = {
+  "Bosnia and Herzegovina": "Bosnia and Herz.",
+  "Czech Republic": "Czechia",
+  "Republic of Serbia": "Serbia",
+  "Macedonia": "North Macedonia",
+  "Turkey": "Türkiye"
+};
+
+// =============================
+// TARGET CITIES
+// =============================
+const cities = [
+  { rank: 1, name: "London", country: "United Kingdom", tier: 1, status: "proposed",
+    note: "<strong>Largest media market in Europe.</strong> No top-tier basketball club. NBA's anchor commercial bet — already running EME HQ from London." },
+  { rank: 2, name: "Paris", country: "France", tier: 1, status: "existing",
+    note: "<strong>Wembanyama-driven viewership surge.</strong> 19 French players in NBA. Paris Basketball ascendant; PSG potential entrant." },
+  { rank: 3, name: "Madrid", country: "Spain", tier: 1, status: "existing",
+    note: "<strong>Real Madrid as marquee anchor.</strong> Multi-sport powerhouse, EuroLeague heavyweight. Highest-leverage existing-club acquisition." },
+  { rank: 4, name: "Berlin", country: "Germany", tier: 1, status: "proposed",
+    note: "<strong>Largest NBA League Pass market in EU.</strong> Bayern based in Munich; Berlin as commercial capital lacks anchor club." },
+  { rank: 5, name: "Manchester", country: "United Kingdom", tier: 1, status: "proposed",
+    note: "<strong>Manchester City ownership group active.</strong> Second UK city signals NBA serious about UK market depth." },
+  { rank: 6, name: "Rome", country: "Italy", tier: 1, status: "proposed",
+    note: "<strong>Italy's commercial capital absent from EuroLeague.</strong> Cultural pull, infrastructure gaps. AC Milan also engaged separately." },
+  { rank: 7, name: "Milan", country: "Italy", tier: 2, status: "existing",
+    note: "<strong>Olimpia Milano established.</strong> Italian fashion-and-finance capital. Strongest Italian basketball brand." },
+  { rank: 8, name: "Munich", country: "Germany", tier: 2, status: "existing",
+    note: "<strong>Bayern Munich basketball, new SAP Arena.</strong> +75% YoY attendance growth — strongest German trajectory." },
+  { rank: 9, name: "Barcelona", country: "Spain", tier: 2, status: "existing",
+    note: "<strong>FC Barcelona basketball as natural entry.</strong> Catalan basketball culture deep. EuroLeague co-incumbent." },
+  { rank: 10, name: "Lyon (ASVEL)", country: "France", tier: 2, status: "existing",
+    note: "<strong>Tony Parker–owned LDLC ASVEL.</strong> Insider Lyon-area entry; symbolic NBA-alumnus bridge to Europe." },
+  { rank: 11, name: "Athens", country: "Greece", tier: 2, status: "existing",
+    note: "<strong>Panathinaikos / Olympiacos — basketball capital of Europe.</strong> Existing demand high; commercial layer underbuilt." },
+  { rank: 12, name: "Belgrade", country: "Serbia", tier: 3, status: "existing",
+    note: "<strong>Highest EuroLeague attendance in Europe.</strong> Cultural lock; commercial scale limits franchise valuation ceiling." }
+];
+
+// =============================
+// RENDER CITIES
+// =============================
+const grid = document.getElementById('cities-grid');
+cities.forEach(c => {
+  const el = document.createElement('div');
+  el.className = `city-card tier-${c.tier}`;
+  el.innerHTML = `
+    <div class="city-rank">No. ${String(c.rank).padStart(2,'0')}</div>
+    <div class="city-name">${c.name}</div>
+    <div class="city-country">${c.country}</div>
+    <div class="city-status ${c.status}">${c.status === 'proposed' ? 'Greenfield Market' : 'Existing Club'}</div>
+    <div class="city-meta">${c.note}</div>
+  `;
+  grid.appendChild(el);
+});
+
+// =============================
+// HEATMAP — D3 + simple Europe topology
+// =============================
+const mapContainer = document.getElementById('map-container');
+const tooltip = document.getElementById('tooltip');
+
+const width = mapContainer.clientWidth;
+const height = mapContainer.clientHeight;
+
+const svg = d3.select('#map-container').append('svg')
+  .attr('viewBox', `0 0 ${width} ${height}`)
+  .attr('preserveAspectRatio', 'xMidYMid meet');
+
+let currentMetric = 'composite';
+
+// Color scale: paper -> accent
+const colorScale = (val) => {
+  // val 0..100
+  const t = Math.max(0, Math.min(1, val / 100));
+  // Interpolate from paper-dim through warm to accent (red)
+  return d3.interpolateRgb('#ede7dc', '#c8102e')(Math.pow(t, 0.85));
+};
+
+// Build legend
+const legendBar = document.getElementById('legend-bar');
+for (let i = 0; i <= 10; i++) {
+  const step = document.createElement('div');
+  step.className = 'legend-step';
+  step.style.background = colorScale(i * 10);
+  legendBar.appendChild(step);
+}
+
+// Load Europe geojson
+d3.json('https://raw.githubusercontent.com/leakyMirror/map-of-europe/master/GeoJSON/europe.geojson').then(geo => {
+  const projection = d3.geoMercator()
+    .center([15, 54])
+    .scale(width * 0.85)
+    .translate([width / 2, height / 2 + 20]);
+
+  const path = d3.geoPath().projection(projection);
+
+  const paths = svg.selectAll('path')
+    .data(geo.features)
+    .enter()
+    .append('path')
+    .attr('d', path)
+    .attr('class', 'country-path')
+    .attr('fill', d => {
+      const name = aliasMap[d.properties.NAME] || d.properties.NAME;
+      const data = countryData[name];
+      return data ? colorScale(data[currentMetric]) : '#dad3c5';
+    })
+    .on('mousemove', function(event, d) {
+      const name = aliasMap[d.properties.NAME] || d.properties.NAME;
+      const data = countryData[name];
+      if (!data) {
+        tooltip.classList.remove('show');
+        return;
+      }
+      const rect = mapContainer.getBoundingClientRect();
+      tooltip.style.left = (event.clientX - rect.left + 14) + 'px';
+      tooltip.style.top  = (event.clientY - rect.top  + 14) + 'px';
+      tooltip.innerHTML = `
+        <div class="tooltip-name">${name}</div>
+        <div class="tooltip-row"><span>Fan base</span><span>${data.fans}</span></div>
+        <div class="tooltip-row"><span>Viewership</span><span>${data.viewership}</span></div>
+        <div class="tooltip-row"><span>Pro league</span><span>${data.attendance}</span></div>
+        <div class="tooltip-row"><span>NBA players</span><span>${data.players}</span></div>
+        <div class="tooltip-score">Composite · <strong>${data.composite}</strong>/100</div>
+      `;
+      tooltip.classList.add('show');
+    })
+    .on('mouseleave', () => tooltip.classList.remove('show'));
+
+  // Metric toggle
+  document.querySelectorAll('.metric-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMetric = btn.dataset.metric;
+      paths.transition().duration(500)
+        .attr('fill', d => {
+          const name = aliasMap[d.properties.NAME] || d.properties.NAME;
+          const data = countryData[name];
+          return data ? colorScale(data[currentMetric]) : '#dad3c5';
+        });
+    });
+  });
+}).catch(err => {
+  // Fallback: render a small bar-list of top countries if map fails to load
+  const fallback = document.createElement('div');
+  fallback.style.cssText = 'padding: 2rem; font-family: "JetBrains Mono", monospace; font-size: 0.85rem;';
+  fallback.innerHTML = '<p style="margin-bottom:1rem; color: var(--muted);">Map data unavailable — showing top countries by composite score:</p>';
+  const sorted = Object.entries(countryData).sort((a,b) => b[1].composite - a[1].composite).slice(0, 15);
+  sorted.forEach(([name, d]) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; align-items:center; gap:1rem; margin-bottom: 0.5rem;';
+    row.innerHTML = `
+      <div style="width: 140px;">${name}</div>
+      <div style="flex:1; height:18px; background:${colorScale(d.composite)}; max-width:${d.composite * 4}px;"></div>
+      <div style="width:30px; text-align:right;">${d.composite}</div>
+    `;
+    fallback.appendChild(row);
+  });
+  mapContainer.innerHTML = '';
+  mapContainer.appendChild(fallback);
+});
+</script>
+
+</body>
+</html>
