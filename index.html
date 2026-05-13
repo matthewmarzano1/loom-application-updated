@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Matt Marzano — For Loom.AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0b0d;
+  --bg-elev: #111317;
+  --bg-card: #14171c;
+  --bg-card-hover: #1a1e25;
+  --border: #1f242c;
+  --border-strong: #2a3038;
+  --text: #f5f7fa;
+  --text-dim: #a8b0bd;
+  --text-mute: #6b7280;
+  --accent: #4d8dff;
+  --accent-bright: #6ea2ff;
+  --accent-deep: #2563eb;
+  --accent-glow: rgba(77, 141, 255, 0.15);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -300px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
+  height: 700px;
+  background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 60px 60px;
+  z-index: 0;
+}
+
+main { position: relative; z-index: 1; }
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 11, 13, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 1.1rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+.nav-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+}
+
+.nav-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  letter-spacing: 0.05em;
+}
+.nav-meta span { color: var(--accent); }
+
+.hero {
+  padding: 7rem 2.5rem 6rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.95rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-bottom: 2.2rem;
+}
+.tag::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.hero h1 {
+  font-weight: 600;
+  font-size: clamp(2.8rem, 7vw, 5.8rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  margin-bottom: 1.8rem;
+  max-width: 1100px;
+}
+.hero h1 .grad {
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--accent) 50%, var(--accent-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+}
+
+.hero-deck {
+  font-size: clamp(1.1rem, 1.5vw, 1.3rem);
+  font-weight: 400;
+  max-width: 720px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-bottom: 3rem;
+}
+
+.byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  letter-spacing: 0.02em;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+.byline span { color: var(--text-dim); }
+.byline strong {
+  color: var(--text-mute);
+  font-weight: 400;
+  margin-right: 0.5rem;
+}
+
+section.block {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 6rem 2.5rem;
+  position: relative;
+}
+section.block + section.block { border-top: 1px solid var(--border); }
+
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 1.4rem;
+}
+.section-label::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  margin-bottom: 2.5rem;
+  max-width: 920px;
+}
+.section-title .grad {
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--accent-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.about-text {
+  font-size: clamp(1.2rem, 1.7vw, 1.5rem);
+  font-weight: 400;
+  line-height: 1.5;
+  max-width: 880px;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.about-text strong {
+  font-weight: 500;
+  color: var(--accent-bright);
+}
+
+.projects {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.project {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 2rem;
+  align-items: center;
+  padding: 2rem 2rem 2rem 1.8rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  text-decoration: none;
+  color: var(--text);
+  position: relative;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+.project::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, var(--accent-glow) 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.project:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+.project:hover::before { opacity: 0.5; }
+.project:hover .project-arrow {
+  transform: translateX(6px);
+  color: var(--accent-bright);
+}
+.project:hover .project-title { color: var(--accent-bright); }
+
+.project-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--text-mute);
+  letter-spacing: 0.05em;
+}
+
+.project-content { position: relative; z-index: 1; }
+
+.project-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+
+.project-title {
+  font-weight: 600;
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.6rem;
+  transition: color 0.25s ease;
+}
+
+.project-desc {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+  max-width: 700px;
+}
+
+.project-arrow {
+  font-size: 1.6rem;
+  color: var(--text-mute);
+  transition: transform 0.25s ease, color 0.25s ease;
+  font-weight: 300;
+  position: relative;
+  z-index: 1;
+}
+
+.why-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-top: 1rem;
+}
+
+.pillar {
+  padding: 2.2rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  position: relative;
+}
+
+.pillar-label {
+  display: inline-block;
+  padding: 0.35rem 0.7rem;
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--accent-bright);
+  letter-spacing: 0.04em;
+  margin-bottom: 1.3rem;
+}
+
+.pillar-head {
+  font-weight: 600;
+  font-size: clamp(1.2rem, 1.6vw, 1.45rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+.pillar-head .grad {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.pillar-body {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.thesis {
+  margin-top: 3rem;
+  padding: 2.5rem 2.8rem;
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(37, 99, 235, 0.06) 100%);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  font-size: clamp(1.1rem, 1.4vw, 1.3rem);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--text);
+  max-width: 980px;
+  letter-spacing: -0.01em;
+}
+.thesis strong {
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.contact {
+  padding: 6rem 2.5rem 5rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  border-top: 1px solid var(--border);
+}
+
+.contact-head {
+  font-weight: 600;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  margin-bottom: 3rem;
+  max-width: 900px;
+}
+.contact-head .grad {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.contact-item {
+  padding: 1.6rem 1.8rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  display: block;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+.contact-item:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.contact-item:hover .contact-value { color: var(--accent-bright); }
+.contact-item:hover .contact-arrow {
+  opacity: 1;
+  transform: translate(2px, -2px);
+}
+
+.contact-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--text-mute);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+.contact-value {
+  font-weight: 500;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  word-break: break-word;
+  transition: color 0.2s ease;
+}
+.contact-arrow {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.4rem;
+  font-size: 1.1rem;
+  color: var(--text-mute);
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.colophon {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 760px) {
+  .nav { padding: 0.95rem 1.4rem; }
+  .nav-meta { display: none; }
+  .hero { padding: 4rem 1.4rem 3rem; }
+  section.block { padding: 4rem 1.4rem; }
+  .project {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    padding: 1.6rem;
+  }
+  .project-arrow { display: none; }
+  .project-num { font-size: 0.7rem; }
+  .why-grid { grid-template-columns: 1fr; }
+  .thesis { padding: 1.8rem; }
+  .contact { padding: 4rem 1.4rem 3rem; }
+  .contact-grid { grid-template-columns: 1fr; }
+  .byline { gap: 1rem 1.5rem; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <span class="nav-dot"></span>
+    <span>Matt Marzano</span>
+  </div>
+  <div class="nav-meta">Built for <span>Loom.AI</span> · 2026</div>
+</nav>
+
+<section class="hero">
+  <div class="tag">Application · Strategy + AI</div>
+  <h1>The missing piece between<br><span class="grad">strategy and AI.</span></h1>
+  <p class="hero-deck">
+    Two years inside Fortune 500 transformations — and an ongoing experiment with what AI can actually do for them.
+  </p>
+  <div class="byline">
+    <span><strong>Built for</strong>Loom.AI</span>
+    <span><strong>By</strong>Matt Marzano</span>
+    <span><strong>Filed</strong>May 2026</span>
+  </div>
+</section>
+
+<section class="block" id="about">
+  <div class="section-label">01 — About</div>
+  <h2 class="section-title">Two years in the room where Fortune 500s decide <span class="grad">what to change.</span></h2>
+  <p class="about-text">
+    I've spent the last two years in management consulting, leading <strong>strategy and change management</strong> projects for Fortune 500 companies — working alongside CEOs, the C-suite, and directors to translate strategy into the slow, human work of actually getting an organization to move.
+  </p>
+</section>
+
+<section class="block" id="work">
+  <div class="section-label">02 — AI Work</div>
+  <h2 class="section-title">Three things I've built <span class="grad">with AI.</span></h2>
+
+  <div class="projects">
+
+    <a class="project" href="projects/fleet-rm-dashboard.html" target="_blank" rel="noopener">
+      <div class="project-num">/ 01</div>
+      <div class="project-content">
+        <div class="project-eyebrow">INTERACTIVE DASHBOARD — REACT</div>
+        <h3 class="project-title">Fleet R&amp;M Command</h3>
+        <p class="project-desc">
+          A working operations dashboard for fleet repair &amp; maintenance — built end-to-end with AI as the engineering partner. The kind of internal tool that usually takes a team a quarter; built solo in days.
+        </p>
+      </div>
+      <div class="project-arrow">→</div>
+    </a>
+
+    <a class="project" href="projects/bridge-the-gap.html" target="_blank" rel="noopener">
+      <div class="project-num">/ 02</div>
+      <div class="project-content">
+        <div class="project-eyebrow">ANALYTICAL TOOL — YOY SPEND</div>
+        <h3 class="project-title">Bridge the Gap</h3>
+        <p class="project-desc">
+          A year-over-year spend analysis tool that breaks variance into the drivers that actually matter — volume, labor, parts. A consulting-grade model wrapped in something a non-analyst can use.
+        </p>
+      </div>
+      <div class="project-arrow">→</div>
+    </a>
+
+    <a class="project" href="projects/nba-europe.html" target="_blank" rel="noopener">
+      <div class="project-num">/ 03</div>
+      <div class="project-content">
+        <div class="project-eyebrow">STRATEGIC ANALYSIS — EDITORIAL</div>
+        <h3 class="project-title">The League Without Borders</h3>
+        <p class="project-desc">
+          A long-form strategic analysis of the NBA's launch of NBA Europe — the $5B bet, the market math, and the international playbook. Research, modeling, and design produced with AI in the loop.
+        </p>
+      </div>
+      <div class="project-arrow">→</div>
+    </a>
+
+  </div>
+</section>
+
+<section class="block" id="why">
+  <div class="section-label">03 — Why Loom.AI</div>
+  <h2 class="section-title">The other half of the <span class="grad">AI puzzle.</span></h2>
+
+  <div class="why-grid">
+
+    <div class="pillar">
+      <div class="pillar-label">WHAT I BRING</div>
+      <h3 class="pillar-head">The <span class="grad">change muscle.</span></h3>
+      <p class="pillar-body">
+        I've sat across the table from CEOs, C-suite, and directors at Fortune 500 companies and led the work of moving a strategy from a deck into the org. The foundations of change management — stakeholder alignment, sequencing, the politics of adoption — are not theoretical for me.
+      </p>
+    </div>
+
+    <div class="pillar">
+      <div class="pillar-label">WHAT I WANT</div>
+      <h3 class="pillar-head">The <span class="grad">AI side</span> of the table.</h3>
+      <p class="pillar-body">
+        I'm genuinely curious about this technology — not as a trend, but as the next thing I want to build my work around. I've been using it daily, shipping projects with it, and watching how it moves from novelty to something an organization can actually run on.
+      </p>
+    </div>
+
+  </div>
+
+  <div class="thesis">
+    The hype around AI is real — but the other half of the puzzle is helping organizations <strong>actually get value</strong> out of these products. That's the gap I keep seeing, and it's the gap I want to spend the next chapter of my career closing. That's why Loom.AI.
+  </div>
+</section>
+
+<section class="contact">
+  <h2 class="contact-head">Let's <span class="grad">talk.</span></h2>
+
+  <div class="contact-grid">
+    <a class="contact-item" href="mailto:marzanomatt@yahoo.com">
+      <div class="contact-arrow">↗</div>
+      <div class="contact-label">Email</div>
+      <div class="contact-value">marzanomatt@yahoo.com</div>
+    </a>
+    <a class="contact-item" href="https://www.linkedin.com/in/matthewmarzano7267991b6/" target="_blank" rel="noopener">
+      <div class="contact-arrow">↗</div>
+      <div class="contact-label">LinkedIn</div>
+      <div class="contact-value">linkedin.com/in/matthewmarzano</div>
+    </a>
+    <a class="contact-item" href="https://matt-marzanos-portfolio.webflow.io/" target="_blank" rel="noopener">
+      <div class="contact-arrow">↗</div>
+      <div class="contact-label">Portfolio</div>
+      <div class="contact-value">matt-marzanos-portfolio.webflow.io</div>
+    </a>
+  </div>
+
+  <div class="colophon">
+    <span>© Matt Marzano · 2026</span>
+    <span>Built for Loom.AI</span>
+  </div>
+</section>
+
+</main>
+</body>
+</html>
