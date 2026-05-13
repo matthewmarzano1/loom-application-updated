@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fleet R&M Command</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js" crossorigin></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #0a0e14; font-family: 'Inter Tight', sans-serif; color: #e6edf3; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .panel {
+    background: linear-gradient(180deg, #11161e 0%, #0d1218 100%);
+    border: 1px solid #1f2630;
+    border-radius: 4px;
+  }
+  .panel-accent { position: relative; }
+  .panel-accent::before {
+    content: ''; position: absolute; top: 0; left: 0; height: 2px; width: 24px;
+    background: #f5a623;
+  }
+  .recharts-text { fill: #6b7785 !important; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+  .recharts-cartesian-axis-line { stroke: #1f2630 !important; }
+  .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #1a1f28 !important; }
+  .recharts-tooltip-wrapper { outline: none; }
+  .nav-btn {
+    padding: 10px 16px; background: transparent; color: #6b7785; border: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; cursor: pointer; transition: color 0.15s;
+    border-bottom: 2px solid transparent;
+  }
+  .nav-btn:hover { color: #e6edf3; }
+  .nav-btn.active { color: #f5a623; border-bottom-color: #f5a623; }
+  .kpi-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: #6b7785; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .kpi-delta-up { color: #ef4444; }
+  .kpi-delta-down { color: #10b981; }
+  .kpi-delta-neutral { color: #6b7785; }
+  .pulse-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #f5a623;
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.7);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0.7); }
+    70% { box-shadow: 0 0 0 8px rgba(245, 166, 35, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 166, 35, 0); }
+  }
+  .scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar::-webkit-scrollbar-track { background: #0a0e14; }
+  .scrollbar::-webkit-scrollbar-thumb { background: #1f2630; border-radius: 3px; }
+  #loading {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #6b7785; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div id="loading">Initializing dashboard…</div>
+<div id="root"></div>
+
+<script type="text/babel" data-type="module" data-presets="react">
+const { useState } = React;
+const {
+  LineChart, Line, BarChart, Bar, ComposedChart, Area, AreaChart,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  ReferenceLine, Cell, PieChart, Pie
+} = Recharts;
+
+const DATA = {
+  kpis: {total_spend_last_12: 3220630.65, total_spend_prior_12: 2068215.18, task_count_last_12: 4596, task_count_prior_12: 2978, avg_cost_last_12: 700.75, avg_cost_prior_12: 694.50, unique_equipment_last_12: 1109},
+  monthly: [
+    {month: "2023-05", spend: 130943.57, tasks: 195, labor: 55702.24, parts: 75241.33},
+    {month: "2023-06", spend: 134222.56, tasks: 187, labor: 63611.21, parts: 70611.35},
+    {month: "2023-07", spend: 108159.26, tasks: 172, labor: 46882.56, parts: 61276.70},
+    {month: "2023-08", spend: 120059.30, tasks: 178, labor: 54560.41, parts: 65498.89},
+    {month: "2023-09", spend: 144405.70, tasks: 223, labor: 68718.20, parts: 75687.50},
+    {month: "2023-10", spend: 151343.79, tasks: 227, labor: 67197.50, parts: 84146.29},
+    {month: "2023-11", spend: 117582.97, tasks: 182, labor: 51763.73, parts: 65819.24},
+    {month: "2023-12", spend: 125760.00, tasks: 197, labor: 58352.54, parts: 67407.46},
+    {month: "2024-01", spend: 135796.80, tasks: 201, labor: 66504.83, parts: 69291.97},
+    {month: "2024-02", spend: 141386.09, tasks: 217, labor: 67543.29, parts: 73842.80},
+    {month: "2024-03", spend: 146478.28, tasks: 229, labor: 71941.81, parts: 74536.47},
+    {month: "2024-04", spend: 139860.00, tasks: 199, labor: 67488.47, parts: 72371.53},
+    {month: "2024-05", spend: 169546.21, tasks: 242, labor: 80055.43, parts: 89490.78},
+    {month: "2024-06", spend: 144062.04, tasks: 206, labor: 69419.81, parts: 74642.23},
+    {month: "2024-07", spend: 168677.27, tasks: 251, labor: 80573.85, parts: 88103.42},
+    {month: "2024-08", spend: 157393.09, tasks: 220, labor: 74394.28, parts: 82998.81},
+    {month: "2024-09", spend: 173763.52, tasks: 249, labor: 81415.69, parts: 92347.83},
+    {month: "2024-10", spend: 179749.87, tasks: 266, labor: 86057.04, parts: 93692.83},
+    {month: "2024-11", spend: 168018.99, tasks: 252, labor: 84945.34, parts: 83073.65},
+    {month: "2024-12", spend: 163623.29, tasks: 240, labor: 79075.11, parts: 84548.18},
+    {month: "2025-01", spend: 209159.86, tasks: 278, labor: 96802.70, parts: 112357.16},
+    {month: "2025-02", spend: 149954.72, tasks: 221, labor: 74197.58, parts: 75757.14},
+    {month: "2025-03", spend: 205062.63, tasks: 299, labor: 99285.74, parts: 105776.89},
+    {month: "2025-04", spend: 174616.17, tasks: 250, labor: 86060.48, parts: 88555.69},
+    {month: "2025-05", spend: 223677.87, tasks: 307, labor: 101643.54, parts: 122034.33},
+    {month: "2025-06", spend: 213908.59, tasks: 303, labor: 100582.90, parts: 113325.69},
+    {month: "2025-07", spend: 219158.48, tasks: 315, labor: 102542.94, parts: 116615.54},
+    {month: "2025-08", spend: 233935.03, tasks: 333, labor: 110730.60, parts: 123204.43},
+    {month: "2025-09", spend: 238728.23, tasks: 361, labor: 118637.24, parts: 120090.99},
+    {month: "2025-10", spend: 233128.44, tasks: 341, labor: 110934.12, parts: 122194.32},
+    {month: "2025-11", spend: 233339.37, tasks: 342, labor: 107958.08, parts: 125381.29},
+    {month: "2025-12", spend: 260013.99, tasks: 394, labor: 125211.02, parts: 134802.97},
+    {month: "2026-01", spend: 328293.64, tasks: 469, labor: 175193.83, parts: 153099.81},
+    {month: "2026-02", spend: 294903.34, tasks: 393, labor: 152024.74, parts: 142878.60},
+    {month: "2026-03", spend: 340277.80, tasks: 477, labor: 173577.25, parts: 166700.55},
+    {month: "2026-04", spend: 387525.74, tasks: 542, labor: 202376.30, parts: 185149.44}
+  ],
+  yearly: [
+    {year: 2023, spend: 1032477.15, tasks: 1561, annualized: 1548715.73},
+    {year: 2024, spend: 1888355.45, tasks: 2772, annualized: 1888355.45},
+    {year: 2025, spend: 2594683.38, tasks: 3744, annualized: 2594683.38},
+    {year: 2026, spend: 1373493.75, tasks: 1910, annualized: 4120481.25}
+  ],
+  by_region: [
+    {Region: "Canada-East", spend: 544131.50, tasks: 794, avg_cost: 685.30, equipment: 97, spend_per_unit: 5609.60},
+    {Region: "Canada-West", spend: 304777.21, tasks: 445, avg_cost: 684.89, equipment: 53, spend_per_unit: 5750.51},
+    {Region: "US-Midwest", spend: 1069537.71, tasks: 1596, avg_cost: 670.14, equipment: 197, spend_per_unit: 5429.13},
+    {Region: "US-Northeast", spend: 1523272.16, tasks: 2201, avg_cost: 692.08, equipment: 257, spend_per_unit: 5927.13},
+    {Region: "US-Southeast", spend: 1346324.75, tasks: 2015, avg_cost: 668.15, equipment: 215, spend_per_unit: 6261.98},
+    {Region: "US-Southwest", spend: 737852.65, tasks: 1046, avg_cost: 705.40, equipment: 141, spend_per_unit: 5232.99},
+    {Region: "US-West", spend: 1363113.75, tasks: 1890, avg_cost: 721.22, equipment: 238, spend_per_unit: 5727.37}
+  ],
+  by_type: [
+    {type: "Brewer", spend: 1349210.99, tasks: 2168, avg_cost: 622.33, equipment: 258, spend_per_unit: 5229.50},
+    {type: "Espresso Machine", spend: 3973746.87, tasks: 4394, avg_cost: 904.36, equipment: 515, spend_per_unit: 7716.01},
+    {type: "Grinder", spend: 1566051.87, tasks: 3425, avg_cost: 457.24, equipment: 425, spend_per_unit: 3684.83}
+  ],
+  by_age: [
+    {age: "<1yr", spend: 1507376.23, tasks: 2636, avg_cost: 571.84},
+    {age: "1-2yr", spend: 937379.52, tasks: 1473, avg_cost: 636.37},
+    {age: "2-3yr", spend: 986534.80, tasks: 1404, avg_cost: 702.66},
+    {age: "3-5yr", spend: 1953394.08, tasks: 2565, avg_cost: 761.56},
+    {age: "5-8yr", spend: 1504325.10, tasks: 1909, avg_cost: 788.02}
+  ],
+  by_issue: [
+    {issue: "Won't Brew", spend: 655136.15, tasks: 827, avg_cost: 792.18},
+    {issue: "Steam Wand", spend: 641012.09, tasks: 798, avg_cost: 803.27},
+    {issue: "No Power", spend: 631123.54, tasks: 820, avg_cost: 769.66},
+    {issue: "Leaking Water", spend: 608154.99, tasks: 785, avg_cost: 774.72},
+    {issue: "Pressure Failure", spend: 598416.82, tasks: 746, avg_cost: 802.17},
+    {issue: "Strange Noise", spend: 594661.54, tasks: 786, avg_cost: 756.57},
+    {issue: "Calibration Drift", spend: 594589.35, tasks: 749, avg_cost: 793.84},
+    {issue: "Temperature", spend: 583478.93, tasks: 762, avg_cost: 765.72}
+  ],
+  worst_offenders: [
+    {serial: "ESP-10238", type: "Espresso Machine", region: "US-Southeast", tasks: 116, spend: 112929.59},
+    {serial: "ESP-10307", type: "Espresso Machine", region: "US-West", tasks: 98, spend: 97737.91},
+    {serial: "BRW-10034", type: "Brewer", region: "US-Southeast", tasks: 94, spend: 48286.40},
+    {serial: "ESP-10276", type: "Espresso Machine", region: "US-Midwest", tasks: 84, spend: 69368.48},
+    {serial: "BRW-10141", type: "Brewer", region: "US-Northeast", tasks: 74, spend: 45112.58},
+    {serial: "ESP-10260", type: "Espresso Machine", region: "US-West", tasks: 67, spend: 52396.22},
+    {serial: "ESP-10420", type: "Espresso Machine", region: "US-Northeast", tasks: 63, spend: 61318.46},
+    {serial: "GRD-10191", type: "Grinder", region: "US-Southeast", tasks: 62, spend: 26306.47}
+  ],
+  anomaly_counts: {missing_completed: 45, missing_accepted: 35, negative_cost: 3, date_errors: 12, runaway_labor: 18, huge_parts: 15, stuck_open: 40, duplicates: 24},
+  labor_rates: [
+    {year: 2023, us: 85, canada: 92, pct_change_us: 0},
+    {year: 2024, us: 89, canada: 95, pct_change_us: 4.7},
+    {year: 2025, us: 94, canada: 98, pct_change_us: 5.6},
+    {year: 2026, us: 112, canada: 105, pct_change_us: 19.1}
+  ]
+};
+
+const REGION_COORDS = {
+  "US-Northeast": {x: 78, y: 32},
+  "US-Southeast": {x: 70, y: 60},
+  "US-Midwest":   {x: 56, y: 38},
+  "US-West":      {x: 18, y: 42},
+  "US-Southwest": {x: 32, y: 58},
+  "Canada-East":  {x: 72, y: 14},
+  "Canada-West":  {x: 26, y: 18}
+};
+
+const fmtCurrency = (v, compact) => {
+  if (v == null) return '—';
+  if (compact) {
+    if (Math.abs(v) >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+    if (Math.abs(v) >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
+    return '$' + v.toFixed(0);
+  }
+  return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+};
+const fmtNum = (v) => v == null ? '—' : v.toLocaleString('en-US');
+const fmtPct = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+
+function buildForecast() {
+  const monthly = DATA.monthly;
+  const n = monthly.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  monthly.forEach((m, i) => {
+    sumX += i; sumY += m.spend;
+    sumXY += i * m.spend; sumXX += i * i;
+  });
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  const lastDate = monthly[n-1].month.split('-').map(Number);
+  let yr = lastDate[0], mo = lastDate[1];
+  const forecast = [];
+  for (let i = 1; i <= 20; i++) {
+    mo += 1;
+    if (mo > 12) { mo = 1; yr += 1; }
+    const idx = n - 1 + i;
+    const pred = slope * idx + intercept;
+    const seasonal = mo === 1 ? 1.05 : mo === 3 ? 1.04 : mo === 7 ? 0.95 : 1.0;
+    const val = Math.max(0, pred * seasonal);
+    forecast.push({
+      month: yr + '-' + String(mo).padStart(2,'0'),
+      forecast: val,
+      forecast_low: val * 0.85,
+      forecast_high: val * 1.18
+    });
+  }
+  return forecast;
+}
+
+const FORECAST = buildForecast();
+
+function Header(props) {
+  const views = [
+    {id: 'overview', label: 'Overview'},
+    {id: 'spend', label: 'Spend Analysis'},
+    {id: 'forecast', label: 'Forecast'},
+    {id: 'geo', label: 'Geographic'},
+    {id: 'fleet', label: 'Fleet Health'},
+    {id: 'anomalies', label: 'Anomalies'}
+  ];
+  return (
+    <div className="border-b border-[#1f2630] bg-[#0a0e14] sticky top-0 z-50">
+      <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="pulse-dot"></div>
+            <div className="mono text-[10px] tracking-[0.15em] text-[#f5a623] uppercase">Live</div>
+          </div>
+          <div className="h-5 w-px bg-[#1f2630]"></div>
+          <div>
+            <div className="text-[15px] font-semibold tracking-tight">Fleet R&amp;M Command</div>
+            <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase">Coffee Equipment · 1,200 Units · NA Region</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase">Report Date</div>
+          <div className="mono text-[12px] text-[#e6edf3]">2026-05-12</div>
+        </div>
+      </div>
+      <div className="max-w-[1600px] mx-auto px-6 flex gap-1 overflow-x-auto scrollbar">
+        {views.map(v => (
+          <button key={v.id} onClick={() => props.setView(v.id)}
+            className={'nav-btn ' + (props.activeView === v.id ? 'active' : '')}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KPI(props) {
+  let deltaClass = 'kpi-delta-neutral';
+  if (props.delta != null) {
+    deltaClass = props.delta > 0 ? 'kpi-delta-up' : 'kpi-delta-down';
+  }
+  return (
+    <div className="panel panel-accent p-5">
+      <div className="kpi-label mb-3">{props.label}</div>
+      <div className="kpi-value mono" style={{color: props.accent || '#e6edf3'}}>{props.value}</div>
+      {props.delta != null && (
+        <div className={'mono text-[11px] mt-2 ' + deltaClass}>
+          {fmtPct(props.delta)} <span className="text-[#6b7785]">{props.deltaLabel}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CustomTooltip(props) {
+  if (!props.active || !props.payload || !props.payload.length) return null;
+  return (
+    <div className="panel p-3 mono text-[11px]" style={{background: '#0d1218'}}>
+      <div className="text-[#6b7785] mb-2 tracking-wider uppercase text-[10px]">{props.label}</div>
+      {props.payload.map((p, i) => (
+        <div key={i} className="flex items-center gap-3 my-1">
+          <div className="w-2 h-2" style={{background: p.color}}></div>
+          <div className="text-[#6b7785]">{p.name}</div>
+          <div className="ml-auto text-[#e6edf3] font-medium">
+            {props.formatter ? props.formatter(p.value) : p.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OverviewView() {
+  const k = DATA.kpis;
+  const spendDelta = ((k.total_spend_last_12 - k.total_spend_prior_12) / k.total_spend_prior_12) * 100;
+  const taskDelta = ((k.task_count_last_12 - k.task_count_prior_12) / k.task_count_prior_12) * 100;
+  const avgCostDelta = ((k.avg_cost_last_12 - k.avg_cost_prior_12) / k.avg_cost_prior_12) * 100;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-4 gap-4">
+        <KPI label="Spend · Trailing 12mo" value={fmtCurrency(k.total_spend_last_12, true)} delta={spendDelta} deltaLabel="vs prior 12mo" />
+        <KPI label="Tasks · Trailing 12mo" value={fmtNum(k.task_count_last_12)} delta={taskDelta} deltaLabel="vs prior 12mo" />
+        <KPI label="Avg Cost / Task" value={fmtCurrency(k.avg_cost_last_12)} delta={avgCostDelta} deltaLabel="vs prior 12mo" />
+        <KPI label="Active Units in Service" value={fmtNum(k.unique_equipment_last_12)} accent="#10b981" />
+      </div>
+
+      <div className="panel p-6">
+        <div className="flex items-baseline justify-between mb-4">
+          <div>
+            <div className="text-[15px] font-semibold">Monthly Spend Trajectory</div>
+            <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mt-1">May 2023 — Apr 2026 · Labor + Parts</div>
+          </div>
+          <div className="mono text-[11px] text-[#6b7785]">
+            <span className="inline-block w-2 h-2 mr-1.5" style={{background:'#f5a623'}}></span>Labor
+            <span className="inline-block w-2 h-2 ml-4 mr-1.5" style={{background:'#3b82f6'}}></span>Parts
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={DATA.monthly}>
+            <CartesianGrid strokeDasharray="0" vertical={false} />
+            <XAxis dataKey="month" interval={2} />
+            <YAxis tickFormatter={v=>fmtCurrency(v,true)} />
+            <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+            <Bar dataKey="parts" stackId="a" fill="#3b82f6" />
+            <Bar dataKey="labor" stackId="a" fill="#f5a623" />
+            <Line type="monotone" dataKey="spend" stroke="#fef3c7" strokeWidth={1.5} dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Year-over-Year Spend</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Annualized · partial years projected</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={DATA.yearly}>
+              <CartesianGrid strokeDasharray="0" vertical={false} />
+              <XAxis dataKey="year" />
+              <YAxis tickFormatter={v=>fmtCurrency(v,true)} />
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Bar dataKey="annualized" radius={[2,2,0,0]}>
+                {DATA.yearly.map((d,i)=>(
+                  <Cell key={i} fill={d.year === 2026 ? '#f5a623' : '#3b82f6'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mono text-[10px] text-[#f5a623] mt-2">⚠ 2026 annualized projection assumes current run-rate</div>
+        </div>
+
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Top Cost Drivers · Issue Categories</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Total spend by issue type</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={DATA.by_issue} layout="vertical" margin={{left: 100}}>
+              <CartesianGrid strokeDasharray="0" horizontal={false} />
+              <XAxis type="number" tickFormatter={v=>fmtCurrency(v,true)} />
+              <YAxis type="category" dataKey="issue" width={100} />
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Bar dataKey="spend" fill="#f5a623" radius={[0,2,2,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <div className="text-[15px] font-semibold mb-4">Executive Read</div>
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            {title: 'Spend up 56% YoY', body: 'Trailing 12mo spend is $3.22M, $1.15M above the prior 12mo window. ~60% of the increase tracks to higher task volume; ~40% to the 2026 US labor rate hike (+19%).', tone: 'warn'},
+            {title: 'Aging fleet is biting', body: 'Units 3+ years old generate $3.45M of total spend despite being 37% of the fleet. Avg cost per task scales from $572 (<1yr) to $788 (5-8yr).', tone: 'warn'},
+            {title: '8 units = 19% of all tasks', body: 'The top 8 worst-performing units account for 658 tasks and $513K in spend. Replacing them outright likely pays back inside 18 months.', tone: 'opportunity'}
+          ].map((t,i) => (
+            <div key={i} className="border border-[#1f2630] p-4">
+              <div className="mono text-[10px] tracking-wider uppercase mb-2" style={{color: t.tone === 'warn' ? '#f5a623' : '#10b981'}}>
+                {t.tone === 'warn' ? '▲ Risk' : '◆ Opportunity'}
+              </div>
+              <div className="font-semibold mb-2">{t.title}</div>
+              <div className="text-[12px] text-[#9ca3af] leading-relaxed">{t.body}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpendView() {
+  const byTypeSorted = DATA.by_type.slice().sort((a,b) => b.spend - a.spend);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-6">
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Spend Composition · Labor vs Parts</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Monthly · stacked</div>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={DATA.monthly}>
+              <defs>
+                <linearGradient id="laborGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f5a623" stopOpacity={0.8}/>
+                  <stop offset="100%" stopColor="#f5a623" stopOpacity={0.2}/>
+                </linearGradient>
+                <linearGradient id="partsGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="month" interval={3} />
+              <YAxis tickFormatter={v=>fmtCurrency(v,true)} />
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Area type="monotone" dataKey="parts" stackId="1" stroke="#3b82f6" fill="url(#partsGrad)" />
+              <Area type="monotone" dataKey="labor" stackId="1" stroke="#f5a623" fill="url(#laborGrad)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Labor Rate · YoY Contract Impact</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">$/hr · 2026 = renegotiated US contract</div>
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={DATA.labor_rates}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="year" />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={v=>v+'%'} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar yAxisId="left" dataKey="us" fill="#f5a623" name="US $/hr" radius={[2,2,0,0]}/>
+              <Bar yAxisId="left" dataKey="canada" fill="#3b82f6" name="Canada $/hr" radius={[2,2,0,0]}/>
+              <Line yAxisId="right" type="monotone" dataKey="pct_change_us" stroke="#ef4444" strokeWidth={2} name="US YoY %" />
+            </ComposedChart>
+          </ResponsiveContainer>
+          <div className="mono text-[11px] text-[#ef4444] mt-2">▲ 2026 US contract added 19% to hourly labor</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Spend by Equipment Type</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Espresso machines dominate</div>
+          <div className="space-y-3">
+            {byTypeSorted.map((t,i) => {
+              const totalSpend = byTypeSorted.reduce((s,x)=>s+x.spend, 0);
+              const pct = (t.spend / totalSpend) * 100;
+              return (
+                <div key={i}>
+                  <div className="flex justify-between mono text-[11px] mb-1">
+                    <span>{t.type}</span>
+                    <span className="text-[#6b7785]">{fmtCurrency(t.spend,true)} · {pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-2 bg-[#1f2630] rounded-sm overflow-hidden">
+                    <div className="h-full" style={{width: pct+'%', background: i === 0 ? '#f5a623' : i === 1 ? '#3b82f6' : '#10b981'}}></div>
+                  </div>
+                  <div className="flex justify-between mono text-[10px] text-[#6b7785] mt-1">
+                    <span>{fmtNum(t.equipment)} units · {fmtNum(t.tasks)} tasks</span>
+                    <span>${t.spend_per_unit.toFixed(0)}/unit</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Cost per Task · by Equipment Age</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Older gear = pricier tickets</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <ComposedChart data={DATA.by_age}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="age" />
+              <YAxis yAxisId="left" tickFormatter={v=>fmtCurrency(v,true)} />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={v=>'$'+v} />
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Bar yAxisId="left" dataKey="spend" fill="#3b82f6" radius={[2,2,0,0]} />
+              <Line yAxisId="right" type="monotone" dataKey="avg_cost" stroke="#f5a623" strokeWidth={2} name="Avg Cost/Task" />
+            </ComposedChart>
+          </ResponsiveContainer>
+          <div className="mono text-[11px] text-[#f5a623] mt-2">▲ 5-8yr equipment costs 38% more per task than &lt;1yr</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ForecastView() {
+  const combined = [
+    ...DATA.monthly.map(m => ({month: m.month, actual: m.spend})),
+    ...FORECAST.map(f => ({month: f.month, forecast: f.forecast, forecast_low: f.forecast_low, forecast_high: f.forecast_high}))
+  ];
+  const annualForecast = {};
+  FORECAST.forEach(f => {
+    const yr = f.month.split('-')[0];
+    if (!annualForecast[yr]) annualForecast[yr] = 0;
+    annualForecast[yr] += f.forecast;
+  });
+  const ytd2026 = DATA.monthly.filter(m => m.month.indexOf('2026') === 0).reduce((s,m)=>s+m.spend,0);
+  if (annualForecast['2026']) annualForecast['2026'] += ytd2026;
+
+  const annualData = [
+    {year: '2023', actual: 1032477},
+    {year: '2024', actual: 1888355},
+    {year: '2025', actual: 2594683},
+    {year: '2026', actual: ytd2026, projected: (annualForecast['2026'] || 0) - ytd2026},
+    {year: '2027', projected: annualForecast['2027'] || 0}
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="panel p-6">
+        <div className="flex items-baseline justify-between mb-4">
+          <div>
+            <div className="text-[15px] font-semibold">36-Month Spend Forecast</div>
+            <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mt-1">Linear trend · 85%/118% confidence band</div>
+          </div>
+          <div className="mono text-[11px] text-[#6b7785]">
+            <span className="inline-block w-2 h-2 mr-1.5" style={{background:'#3b82f6'}}></span>Actual
+            <span className="inline-block w-2 h-2 ml-4 mr-1.5" style={{background:'#f5a623'}}></span>Forecast
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <ComposedChart data={combined}>
+            <defs>
+              <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f5a623" stopOpacity={0.25}/>
+                <stop offset="100%" stopColor="#f5a623" stopOpacity={0.02}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="month" interval={3} />
+            <YAxis tickFormatter={v=>fmtCurrency(v,true)} />
+            <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+            <Area type="monotone" dataKey="forecast_high" stroke="none" fill="url(#bandGrad)" />
+            <Area type="monotone" dataKey="forecast_low" stroke="none" fill="#0a0e14" />
+            <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="forecast" stroke="#f5a623" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <KPI label="2026 Full-Year Forecast" value={fmtCurrency(annualForecast['2026'], true)} accent="#f5a623" />
+        <KPI label="2027 Forecast" value={fmtCurrency(annualForecast['2027'], true)} accent="#ef4444" />
+        <KPI label="3-Year Cumulative ('26-'28)" value={fmtCurrency(Object.values(annualForecast).reduce((a,b)=>a+b,0), true)} accent="#ef4444" />
+      </div>
+
+      <div className="panel p-6">
+        <div className="text-[15px] font-semibold mb-1">Annual Budget Outlook</div>
+        <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Historical + projected · stacked</div>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={annualData}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="year" />
+            <YAxis tickFormatter={v=>fmtCurrency(v,true)} />
+            <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+            <Bar dataKey="actual" stackId="a" fill="#3b82f6" name="Actual" />
+            <Bar dataKey="projected" stackId="a" fill="#f5a623" name="Projected" radius={[2,2,0,0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="panel p-6">
+        <div className="text-[15px] font-semibold mb-4">Forecast Caveats</div>
+        <div className="grid grid-cols-2 gap-4 text-[12px] text-[#9ca3af] leading-relaxed">
+          <div className="border-l-2 border-[#f5a623] pl-4">
+            <div className="mono text-[10px] tracking-wider uppercase text-[#f5a623] mb-2">Assumes</div>
+            Task volume growth continues at observed rate (~30% YoY). Labor rates hold at 2026 contract levels. No major fleet additions or retirements.
+          </div>
+          <div className="border-l-2 border-[#10b981] pl-4">
+            <div className="mono text-[10px] tracking-wider uppercase text-[#10b981] mb-2">Levers to bend the curve</div>
+            Retire top 8 problem units (~$300K/yr savings). Shift 30% of espresso work to PM contracts (avg task -50%). Renegotiate parts pricing on top 3 SKUs.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeoView() {
+  const maxSpend = Math.max(...DATA.by_region.map(r => r.spend));
+  const [hoveredRegion, setHoveredRegion] = useState(null);
+  const byEfficiency = DATA.by_region.slice().sort((a,b) => b.spend_per_unit - a.spend_per_unit);
+  const hovered = hoveredRegion ? DATA.by_region.find(x => x.Region === hoveredRegion) : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-6">
+        <div className="col-span-2 panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Spend Heatmap · North America</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Bubble size = total spend · color = spend/unit intensity</div>
+          <div className="relative" style={{height: 380, background: '#0a0e14', border: '1px solid #1f2630', borderRadius: 4}}>
+            <svg viewBox="0 0 100 75" className="w-full h-full">
+              <path d="M 8 28 L 18 14 L 32 10 L 50 8 L 68 9 L 82 12 L 92 18 L 90 30 L 88 42 L 82 50 L 78 55 L 70 60 L 60 64 L 50 65 L 40 64 L 30 60 L 22 55 L 16 48 L 10 38 Z"
+                    fill="#11161e" stroke="#1f2630" strokeWidth="0.3" />
+              <path d="M 12 28 L 88 28" stroke="#1f2630" strokeWidth="0.2" strokeDasharray="0.5 0.5" />
+              {DATA.by_region.map((r,i) => {
+                const coord = REGION_COORDS[r.Region];
+                if (!coord) return null;
+                const radius = 2 + (r.spend / maxSpend) * 8;
+                const maxPerUnit = Math.max(...DATA.by_region.map(x => x.spend_per_unit));
+                const minPerUnit = Math.min(...DATA.by_region.map(x => x.spend_per_unit));
+                const t = (r.spend_per_unit - minPerUnit) / (maxPerUnit - minPerUnit);
+                const color = t > 0.5 ? '#f5a623' : t > 0.3 ? '#fbbf24' : '#10b981';
+                const isHover = hoveredRegion === r.Region;
+                return (
+                  <g key={i}>
+                    <circle cx={coord.x} cy={coord.y} r={radius + 2} fill={color} opacity="0.15" />
+                    <circle cx={coord.x} cy={coord.y} r={radius}
+                            fill={color} opacity={isHover ? 1 : 0.8}
+                            stroke={isHover ? '#e6edf3' : 'none'} strokeWidth="0.3"
+                            style={{cursor:'pointer', transition: 'all 0.2s'}}
+                            onMouseEnter={() => setHoveredRegion(r.Region)}
+                            onMouseLeave={() => setHoveredRegion(null)} />
+                    <text x={coord.x} y={coord.y + radius + 3} textAnchor="middle"
+                          fill="#6b7785" fontSize="2.2" fontFamily="JetBrains Mono">
+                      {r.Region.replace('US-','').replace('Canada-','CA-')}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+            {hovered && (
+              <div className="absolute top-3 right-3 panel p-4 mono text-[11px]" style={{background:'#0d1218', minWidth: 200}}>
+                <div className="text-[#f5a623] tracking-wider uppercase text-[10px] mb-2">{hovered.Region}</div>
+                <div className="flex justify-between"><span className="text-[#6b7785]">Total Spend</span><span>{fmtCurrency(hovered.spend, true)}</span></div>
+                <div className="flex justify-between"><span className="text-[#6b7785]">Tasks</span><span>{fmtNum(hovered.tasks)}</span></div>
+                <div className="flex justify-between"><span className="text-[#6b7785]">Units</span><span>{fmtNum(hovered.equipment)}</span></div>
+                <div className="flex justify-between border-t border-[#1f2630] mt-2 pt-2"><span className="text-[#6b7785]">$ / unit</span><span className="text-[#f5a623]">${hovered.spend_per_unit.toFixed(0)}</span></div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Spend per Unit · Ranked</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Cost intensity</div>
+          <div className="space-y-3">
+            {byEfficiency.map((r,i) => {
+              const maxPU = byEfficiency[0].spend_per_unit;
+              const pct = (r.spend_per_unit / maxPU) * 100;
+              return (
+                <div key={i}>
+                  <div className="flex justify-between mono text-[11px] mb-1">
+                    <span>{r.Region}</span>
+                    <span className={i === 0 ? 'text-[#ef4444]' : i < 3 ? 'text-[#f5a623]' : 'text-[#10b981]'}>
+                      ${r.spend_per_unit.toFixed(0)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-[#1f2630] rounded-sm overflow-hidden">
+                    <div className="h-full" style={{
+                      width: pct+'%',
+                      background: i === 0 ? '#ef4444' : i < 3 ? '#f5a623' : '#10b981'
+                    }}></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Spend by Region · Absolute</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={DATA.by_region.slice().sort((a,b)=>b.spend-a.spend)}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="Region" angle={-30} textAnchor="end" height={60}/>
+              <YAxis tickFormatter={v=>fmtCurrency(v,true)} />
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Bar dataKey="spend" fill="#3b82f6" radius={[2,2,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Avg Cost per Task · by Region</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={DATA.by_region.slice().sort((a,b)=>b.avg_cost-a.avg_cost)}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="Region" angle={-30} textAnchor="end" height={60}/>
+              <YAxis tickFormatter={v=>'$'+v} />
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Bar dataKey="avg_cost" fill="#f5a623" radius={[2,2,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FleetView() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-4">
+        <KPI label="Fleet Size" value="1,200" />
+        <KPI label="Avg Equipment Age" value="3.4yr" />
+        <KPI label="Top 8 = % of Tasks" value="6.6%" accent="#f5a623" />
+      </div>
+
+      <div className="panel p-6">
+        <div className="text-[15px] font-semibold mb-1">Worst-Performing Equipment · "Problem Children"</div>
+        <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Abnormally high failure rates · replacement candidates</div>
+        <div className="overflow-x-auto scrollbar">
+          <table className="w-full mono text-[11px]">
+            <thead>
+              <tr className="border-b border-[#1f2630] text-[#6b7785]">
+                <th className="text-left py-2 px-3 tracking-wider uppercase text-[10px]">Serial</th>
+                <th className="text-left py-2 px-3 tracking-wider uppercase text-[10px]">Type</th>
+                <th className="text-left py-2 px-3 tracking-wider uppercase text-[10px]">Region</th>
+                <th className="text-right py-2 px-3 tracking-wider uppercase text-[10px]">Tasks</th>
+                <th className="text-right py-2 px-3 tracking-wider uppercase text-[10px]">Spend</th>
+                <th className="text-right py-2 px-3 tracking-wider uppercase text-[10px]">$/Task</th>
+                <th className="text-right py-2 px-3 tracking-wider uppercase text-[10px]">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DATA.worst_offenders.map((o,i) => (
+                <tr key={i} className="border-b border-[#11161e] hover:bg-[#11161e]">
+                  <td className="py-2.5 px-3 text-[#f5a623]">{o.serial}</td>
+                  <td className="py-2.5 px-3">{o.type}</td>
+                  <td className="py-2.5 px-3 text-[#6b7785]">{o.region}</td>
+                  <td className="py-2.5 px-3 text-right">{o.tasks}</td>
+                  <td className="py-2.5 px-3 text-right">{fmtCurrency(o.spend)}</td>
+                  <td className="py-2.5 px-3 text-right text-[#6b7785]">${Math.round(o.spend/o.tasks)}</td>
+                  <td className="py-2.5 px-3 text-right">
+                    <span className={'px-2 py-1 text-[9px] tracking-wider uppercase ' + (o.tasks > 60 ? 'bg-[#ef4444] bg-opacity-15 text-[#ef4444]' : 'bg-[#f5a623] bg-opacity-15 text-[#f5a623]')}>
+                      {o.tasks > 60 ? 'Replace' : 'Review'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Spend Distribution by Age</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Where the money goes</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={DATA.by_age} dataKey="spend" nameKey="age" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                {DATA.by_age.map((d,i) => (
+                  <Cell key={i} fill={['#10b981','#3b82f6','#a855f7','#f5a623','#ef4444'][i]} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip formatter={v=>fmtCurrency(v)} />} />
+              <Legend wrapperStyle={{fontSize: 10, color: '#6b7785', fontFamily: 'JetBrains Mono'}} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="panel p-6">
+          <div className="text-[15px] font-semibold mb-1">Replacement ROI Calculator</div>
+          <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">If we retired the top 8 worst units…</div>
+          <div className="space-y-3 mono text-[12px]">
+            <div className="flex justify-between p-3 border border-[#1f2630]">
+              <span className="text-[#6b7785]">Current annual R&amp;M spend (top 8)</span>
+              <span className="text-[#ef4444]">~$340,000</span>
+            </div>
+            <div className="flex justify-between p-3 border border-[#1f2630]">
+              <span className="text-[#6b7785]">New unit capital cost (8 × ~$45K)</span>
+              <span>$360,000</span>
+            </div>
+            <div className="flex justify-between p-3 border border-[#1f2630]">
+              <span className="text-[#6b7785]">Expected R&amp;M post-replacement</span>
+              <span className="text-[#10b981]">~$45,000/yr</span>
+            </div>
+            <div className="flex justify-between p-3 border border-[#f5a623] bg-[#f5a623] bg-opacity-5">
+              <span className="text-[#f5a623]">Payback period</span>
+              <span className="text-[#f5a623] font-semibold">~14 months</span>
+            </div>
+            <div className="text-[11px] text-[#6b7785] mt-2 leading-relaxed">
+              Note: R&amp;M savings only. Downtime and lost-sales impact would shorten payback further.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnomaliesView() {
+  const anomalies = [
+    {label: 'Missing Completion Date', count: DATA.anomaly_counts.missing_completed, severity: 'medium', desc: 'Tasks with no recorded completion date — likely closed offline or data sync issue.'},
+    {label: 'Missing Acceptance Date', count: DATA.anomaly_counts.missing_accepted, severity: 'medium', desc: 'Tasks skipped the acceptance step entirely. Process compliance gap.'},
+    {label: 'Stuck Open (>90 days)', count: DATA.anomaly_counts.stuck_open, severity: 'high', desc: 'Submitted long ago but never accepted or completed. May be lost work.'},
+    {label: 'Likely Duplicate Records', count: DATA.anomaly_counts.duplicates, severity: 'high', desc: 'Same serial, date, and cost on multiple records. Possible double-billing.'},
+    {label: 'Runaway Labor (>30hr)', count: DATA.anomaly_counts.runaway_labor, severity: 'high', desc: 'Single task with 30+ labor hours. Review with vendor — may need investigation.'},
+    {label: 'Suspicious Parts Cost (>$3K)', count: DATA.anomaly_counts.huge_parts, severity: 'medium', desc: 'Parts cost dramatically above category average. Verify SKU pricing.'},
+    {label: 'Date Logic Errors', count: DATA.anomaly_counts.date_errors, severity: 'low', desc: 'Completion date before submission date. Data entry error.'},
+    {label: 'Negative Cost Values', count: DATA.anomaly_counts.negative_cost, severity: 'low', desc: 'Parts cost recorded as negative — likely refunds or warranty credits coded wrong.'}
+  ];
+  const totalCount = anomalies.reduce((s,a) => s + a.count, 0);
+  const estimatedExposure = (DATA.anomaly_counts.duplicates * 700) + (DATA.anomaly_counts.runaway_labor * 4000) + (DATA.anomaly_counts.huge_parts * 5000) + (DATA.anomaly_counts.stuck_open * 700);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-4">
+        <KPI label="Total Flagged Records" value={fmtNum(totalCount)} accent="#f5a623" />
+        <KPI label="Estimated $ Exposure" value={fmtCurrency(estimatedExposure, true)} accent="#ef4444" />
+        <KPI label="% of Total Records" value={(totalCount/10012*100).toFixed(1)+'%'} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        {anomalies.map((a,i) => {
+          const sevColor = a.severity === 'high' ? '#ef4444' : a.severity === 'medium' ? '#f5a623' : '#6b7785';
+          return (
+            <div key={i} className="panel p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="mono text-[10px] tracking-wider uppercase mb-1" style={{color: sevColor}}>
+                    ▲ {a.severity}
+                  </div>
+                  <div className="font-semibold text-[14px]">{a.label}</div>
+                </div>
+                <div className="mono text-[26px] font-bold" style={{color: sevColor}}>{a.count}</div>
+              </div>
+              <div className="text-[12px] text-[#9ca3af] leading-relaxed">{a.desc}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="panel p-6">
+        <div className="text-[15px] font-semibold mb-1">Recommended Next Steps</div>
+        <div className="mono text-[10px] text-[#6b7785] tracking-wider uppercase mb-4">Prioritized by financial impact</div>
+        <div className="space-y-3">
+          {[
+            {n: 1, title: 'Investigate 24 duplicate records', body: 'Cross-check vendor invoices against task IDs. Potential recovery: $15-25K.', color: '#ef4444'},
+            {n: 2, title: 'Audit 18 runaway-labor tickets', body: 'Each is 30-80 hrs — well above category average. Could be legitimate (major rebuilds) or billing errors.', color: '#ef4444'},
+            {n: 3, title: 'Verify 15 high-parts-cost claims', body: 'Parts >$3K. Compare to OEM list pricing. Renegotiate with supplier if confirmed inflated.', color: '#f5a623'},
+            {n: 4, title: 'Close out 40 stuck-open tickets', body: 'Work was likely done but never logged. Reconcile with field service.', color: '#f5a623'},
+            {n: 5, title: 'Patch data entry workflow', body: '80 records missing dates and 12 with date logic errors point to UI/process issues at intake.', color: '#6b7785'}
+          ].map((s,i) => (
+            <div key={i} className="flex items-start gap-4 p-3 border border-[#1f2630]">
+              <div className="mono text-[20px] font-bold" style={{color: s.color}}>{'0' + s.n}</div>
+              <div className="flex-1">
+                <div className="font-semibold text-[13px] mb-1">{s.title}</div>
+                <div className="text-[11px] text-[#9ca3af]">{s.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [view, setView] = useState('overview');
+  const views = {
+    overview: <OverviewView />,
+    spend: <SpendView />,
+    forecast: <ForecastView />,
+    geo: <GeoView />,
+    fleet: <FleetView />,
+    anomalies: <AnomaliesView />
+  };
+  return (
+    <div className="min-h-screen bg-[#0a0e14] bg-grid">
+      <Header activeView={view} setView={setView} />
+      <div className="max-w-[1600px] mx-auto px-6 py-6">
+        {views[view]}
+        <div className="mt-10 mb-4 text-center mono text-[9px] text-[#6b7785] tracking-wider uppercase">
+          Fleet R&amp;M Command · Prototype · Dummy Data
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Hide loader & render
+document.getElementById('loading').style.display = 'none';
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
