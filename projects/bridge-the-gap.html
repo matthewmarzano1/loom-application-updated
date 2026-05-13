@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge The Gap - YoY Spend Analysis</title>
+
+<!--
+========================================================================
+  BRIDGE THE GAP - YoY Equipment Spend Analysis Tool
+========================================================================
+  This file is fully self-contained. Open it in any browser to use.
+
+  HOW THIS FILE IS ORGANIZED
+  ---------------------------
+  1. STYLES        (the <style> block below) - colors, fonts, layout
+  2. HEADER        - title and step pills
+  3. STEP 1        - spend & task inputs
+  4. STEP 2        - work task volume (fleet growth)
+  5. STEP 3        - cost per task (labor & parts)
+  6. STEP 4        - bridge / waterfall chart
+  7. STEP 5        - summary & recommended actions
+  8. NAVIGATION    - back/next buttons
+  9. SCRIPT        - all calculations and chart drawing
+
+  WHERE TO MAKE COMMON EDITS
+  ---------------------------
+  - Change default input values:  search for value="..." in each step
+  - Change tooltip text:           search for data-tip="..."
+  - Change colors:                 see ":root" in <style> and chart colors in drawWaterfall()
+  - Change the math:               see the compute() function in <script>
+  - Change summary wording:        see updateStep5() in <script>
+========================================================================
+-->
+
+<style>
+/* ============================================
+   COLOR & FONT VARIABLES
+   Change these to restyle the whole tool.
+   ============================================ */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f4ef;
+  --bg-tertiary: #faf9f5;
+  --bg-info: #e6f1fb;
+  --bg-success: #eaf3de;
+  --bg-warning: #faeeda;
+  --bg-danger: #fcebeb;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #9a9a9a;
+  --text-info: #185fa5;
+  --text-success: #3b6d11;
+  --text-warning: #854f0b;
+  --text-danger: #a32d2d;
+
+  --border-tertiary: rgba(0,0,0,0.10);
+  --border-secondary: rgba(0,0,0,0.20);
+  --border-primary: rgba(0,0,0,0.35);
+
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --color-controllable: #378ADD;  /* blue - your team's bucket */
+  --color-uncontrollable: #BA7517; /* amber - outside your control */
+  --color-total: #888780;          /* gray - PY/CY totals */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 2rem 1rem;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  border: 0.5px solid var(--border-tertiary);
+  padding: 1.5rem 2rem 2rem;
+}
+
+h1, h2, h3 { font-weight: 500; margin: 0; }
+
+/* form elements */
+input[type="number"] {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 0.5px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+}
+input[type="number"]:focus {
+  outline: none;
+  border-color: var(--text-info);
+  box-shadow: 0 0 0 2px var(--bg-info);
+}
+
+button {
+  height: 36px;
+  padding: 0 16px;
+  background: transparent;
+  border: 0.5px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+button:hover { background: var(--bg-secondary); }
+button:active { transform: scale(0.98); }
+
+/* step pills */
+.step-pill {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  padding: 8px 6px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.step-pill.active { background: var(--bg-info); color: var(--text-info); font-weight: 500; }
+.step-pill.done { background: var(--bg-success); color: var(--text-success); }
+
+/* panels */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* field rows */
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.field-row label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+
+/* callouts */
+.callout {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.callout .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); margin-bottom: 4px; }
+
+/* metric cards */
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+.metric-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.metric-card .lbl { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+.metric-card .val { font-size: 20px; font-weight: 500; margin-top: 2px; }
+.metric-card .val.pos { color: var(--text-danger); }
+.metric-card .val.neg { color: var(--text-success); }
+
+/* navigation row */
+.nav-row { display: flex; justify-content: space-between; margin-top: 1.25rem; gap: 8px; }
+
+/* tags */
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tag.unctrl { background: var(--bg-warning); color: var(--text-warning); }
+.tag.ctrl { background: var(--bg-info); color: var(--text-info); }
+
+/* driver rows */
+.driver-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border-tertiary);
+  font-size: 13px;
+}
+.driver-row:last-child { border-bottom: none; }
+.driver-row .name { display: flex; align-items: center; gap: 8px; }
+.driver-row .amt { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+.section-title { font-size: 14px; font-weight: 500; margin: 14px 0 8px; }
+.helper { font-size: 12px; color: var(--text-tertiary); line-height: 1.6; margin: -6px 0 12px; }
+
+/* info icon & tooltips */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  font-style: italic;
+  font-family: Georgia, serif;
+  cursor: help;
+  color: var(--text-tertiary);
+  border: 0.5px solid var(--border-secondary);
+  border-radius: 50%;
+}
+.info-icon:hover { color: var(--text-primary); border-color: var(--border-primary); }
+
+.has-tip { position: relative; }
+.has-tip[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  white-space: normal;
+  width: 240px;
+  z-index: 10;
+  line-height: 1.5;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  pointer-events: none;
+}
+.has-tip[data-tip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--text-primary);
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* legend */
+.legend-row { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+.legend-row span { display: flex; align-items: center; gap: 6px; }
+.legend-row .sw { width: 10px; height: 10px; border-radius: 2px; }
+
+/* context boxes (the "what this means" explainer blocks) */
+.context-box {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.context-box strong { color: var(--text-primary); font-weight: 500; }
+
+/* summary page */
+.summary-section { margin-bottom: 1.5rem; }
+.summary-section h3 { font-size: 15px; font-weight: 500; margin: 0 0 6px; }
+.summary-section p { font-size: 13px; line-height: 1.7; margin: 0 0 8px; color: var(--text-secondary); }
+
+.action-card {
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.action-card .head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.action-card .body { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- ============================================
+     HEADER
+     ============================================ -->
+<div style="margin-bottom: 1rem;">
+  <h1 style="font-size: 20px;">Bridge the gap</h1>
+  <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">YoY equipment spend: controllable vs. not</p>
+</div>
+
+<!-- ============================================
+     STEP PILLS (the progress bar at the top)
+     ============================================ -->
+<div id="stepper" style="display: flex; gap: 6px; margin-bottom: 1.25rem;">
+  <div class="step-pill active" data-step="0">1. Spend</div>
+  <div class="step-pill" data-step="1">2. Work tasks</div>
+  <div class="step-pill" data-step="2">3. Cost per task</div>
+  <div class="step-pill" data-step="3">4. Bridge</div>
+  <div class="step-pill" data-step="4">5. Summary</div>
+</div>
+
+<!-- ============================================
+     STEP 1: SPEND & TASK INPUTS
+     ============================================ -->
+<div class="panel active" data-panel="0">
+  <p style="font-size: 14px; margin: 0 0 12px;">Enter total spend and work-task volume for both years.</p>
+
+  <div class="context-box">
+    <strong>What's a "work task"?</strong> Any discrete unit of work performed on a piece of equipment - a PM, a repair, an inspection, a component swap. Pick whichever definition your team already uses for reporting, and use the same definition for both years.
+  </div>
+
+  <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); margin-bottom: 8px;">Prior year</div>
+  <div class="field-row">
+    <div><label>Total spend ($) <span class="info-icon has-tip" data-tip="All-in equipment program spend last year: labor + parts + overhead + outside services.">i</span></label><input type="number" id="py_spend" value="10000000" step="10000"></div>
+    <div><label>Work tasks (#) <span class="info-icon has-tip" data-tip="Total count of completed work tasks last year, using whatever task definition your team reports on.">i</span></label><input type="number" id="py_tasks" value="50000" step="100"></div>
+  </div>
+
+  <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); margin: 12px 0 8px;">Current year</div>
+  <div class="field-row">
+    <div><label>Total spend ($) <span class="info-icon has-tip" data-tip="All-in equipment program spend this year, on the same basis as prior year.">i</span></label><input type="number" id="cy_spend" value="11500000" step="10000"></div>
+    <div><label>Work tasks (#) <span class="info-icon has-tip" data-tip="Total count of completed work tasks this year, same definition as prior year.">i</span></label><input type="number" id="cy_tasks" value="54000" step="100"></div>
+  </div>
+
+  <div class="callout" id="overview-callout"></div>
+</div>
+
+<!-- ============================================
+     STEP 2: WORK TASK VOLUME (fleet growth)
+     ============================================ -->
+<div class="panel" data-panel="1">
+  <p style="font-size: 14px; margin: 0 0 4px;">Why did the number of work tasks change?</p>
+  <p class="helper">More tasks at the same cost still drives spend up. We need to strip out the part of the volume increase you can't control - fleet size - so what's left is the volume your team can actually move.</p>
+
+  <div class="section-title"><span class="tag unctrl">Out of your control</span> Fleet size change</div>
+  <div class="context-box">
+    <strong>Why this is uncontrollable:</strong> If the business adds units, more work tasks naturally follow. Your team doesn't decide how many units the company operates, so the tasks generated by fleet growth alone aren't a fair target for cost reduction.
+    <br><br>
+    <strong>How we model it:</strong> We hold tasks-per-unit flat at the prior-year rate, then ask: "If we'd had this many units last year, how many tasks would we have expected?" The difference between that and actual current-year tasks is what's left to attack.
+  </div>
+  <div class="field-row">
+    <div>
+      <label>Prior year unit count <span class="info-icon has-tip" data-tip="Average number of units in the fleet during the prior year.">i</span></label>
+      <input type="number" id="py_units" value="1000" step="1">
+    </div>
+    <div>
+      <label>Current year unit count <span class="info-icon has-tip" data-tip="Average number of units in the fleet this year.">i</span></label>
+      <input type="number" id="cy_units" value="1050" step="1">
+    </div>
+  </div>
+
+  <div class="callout" id="tasks-callout"></div>
+</div>
+
+<!-- ============================================
+     STEP 3: COST PER TASK (labor & parts)
+     ============================================ -->
+<div class="panel" data-panel="2">
+  <p style="font-size: 14px; margin: 0 0 4px;">Why did the cost per work task change?</p>
+  <p class="helper">Labor contracts and parts pricing usually aren't yours to negotiate. We quantify how much of the cost-per-task increase comes from those two, and whatever's left over is on your team.</p>
+
+  <div class="section-title"><span class="tag unctrl">Out of your control</span> Labor rate changes</div>
+  <div class="context-box">
+    <strong>What this captures:</strong> The YoY change in the hourly or fully-loaded labor rate from your labor agreement - collective bargaining outcomes, market adjustments, benefits inflation. Your team executes the work, but doesn't set the rate.
+    <br><br>
+    <strong>How we model it:</strong> Multiply the prior-year cost per task by labor's share of that cost, then by the rate change %. That gives the labor inflation impact per task, which we scale up by current-year task volume.
+  </div>
+  <div class="field-row">
+    <div>
+      <label>Labor rate change (%) <span class="info-icon has-tip" data-tip="The YoY % change in your fully-loaded labor rate. If technicians cost 3.5% more per hour this year, enter 3.5.">i</span></label>
+      <input type="number" id="labor_pct" value="3.5" step="0.1">
+    </div>
+    <div>
+      <label>Labor share of task cost (%) <span class="info-icon has-tip" data-tip="What % of an average work task's cost is labor (vs. parts, overhead, outside services). Typical range: 30-50%.">i</span></label>
+      <input type="number" id="labor_share" value="40" step="1">
+    </div>
+  </div>
+
+  <div class="section-title"><span class="tag unctrl">Out of your control</span> Parts price changes</div>
+  <div class="context-box">
+    <strong>What this captures:</strong> The YoY change in unit prices for the parts you buy - vendor price increases, raw-material inflation, supply-chain pass-through. This is <em>price</em>, not <em>usage</em>. Usage (how many parts you consume per task) stays in the controllable bucket.
+    <br><br>
+    <strong>How we model it:</strong> Same pattern as labor - prior-year cost per task &times; parts share &times; price change %, scaled by current-year tasks.
+  </div>
+  <div class="field-row">
+    <div>
+      <label>Parts price change (%) <span class="info-icon has-tip" data-tip="The weighted-average YoY price change across the parts your team buys. Pull from your top SKUs by spend if you don't have a global figure.">i</span></label>
+      <input type="number" id="parts_pct" value="5.0" step="0.1">
+    </div>
+    <div>
+      <label>Parts share of task cost (%) <span class="info-icon has-tip" data-tip="What % of an average work task's cost is parts. Typical range: 25-45%.">i</span></label>
+      <input type="number" id="parts_share" value="35" step="1">
+    </div>
+  </div>
+
+  <div class="section-title"><span class="tag ctrl">Your team's bucket</span> Everything else in rate</div>
+  <div class="context-box">
+    <strong>What this captures:</strong> Whatever movement in cost-per-task remains after labor inflation and parts inflation are stripped out. In practice this includes <strong>parts usage per task</strong> (using more or premium parts where standard would do), <strong>labor hours per task</strong> (efficiency, job plan adherence, rework), <strong>vendor and sourcing mix</strong> (which suppliers and outside shops you use), <strong>scope per work order</strong>, <strong>first-time-fix rate</strong> (rework drives effective cost up), and <strong>overhead allocation</strong>.
+    <br><br>
+    This is the bucket where your team's decisions show up. We'll compute it automatically from the residual.
+  </div>
+
+  <div class="callout" id="cost-callout"></div>
+</div>
+
+<!-- ============================================
+     STEP 4: BRIDGE / WATERFALL CHART
+     ============================================ -->
+<div class="panel" data-panel="3">
+  <p style="font-size: 14px; margin: 0 0 12px;">Here's the full bridge from prior year to current year spend.</p>
+
+  <div class="legend-row">
+    <span><span class="sw" style="background: #888780;"></span>Total spend (PY / CY)</span>
+    <span><span class="sw" style="background: #BA7517;"></span>Uncontrollable driver</span>
+    <span><span class="sw" style="background: #378ADD;"></span>Your team's bucket</span>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric-card">
+      <div class="lbl">Total YoY change <span class="info-icon has-tip" data-tip="Current year spend minus prior year spend. The full gap we're decomposing.">i</span></div>
+      <div class="val has-tip" id="m_total" data-tip="">-</div>
+    </div>
+    <div class="metric-card">
+      <div class="lbl">Uncontrollable <span class="info-icon has-tip" data-tip="Sum of fleet growth + labor rate + parts price impacts. Outside your team's influence.">i</span></div>
+      <div class="val has-tip" id="m_uncon" data-tip="">-</div>
+    </div>
+    <div class="metric-card">
+      <div class="lbl">Worth going after <span class="info-icon has-tip" data-tip="Sum of tasks-beyond-fleet-growth + everything-else-in-rate. The portion your team can actually influence.">i</span></div>
+      <div class="val has-tip" id="m_ctrl" data-tip="">-</div>
+    </div>
+  </div>
+
+  <div style="position: relative; width: 100%; height: 320px; margin: 1rem 0;">
+    <canvas id="waterfall" role="img" aria-label="Waterfall chart bridging prior year spend to current year spend through fleet growth, labor rate, parts price, and controllable drivers."></canvas>
+  </div>
+
+  <div class="section-title">Driver breakdown</div>
+  <div id="driver-list"></div>
+</div>
+
+<!-- ============================================
+     STEP 5: SUMMARY & RECOMMENDED ACTIONS
+     Most of this content is generated by updateStep5()
+     in the script below. Edit wording there.
+     ============================================ -->
+<div class="panel" data-panel="4">
+  <div id="summary-content"></div>
+</div>
+
+<!-- ============================================
+     NAVIGATION BUTTONS
+     ============================================ -->
+<div class="nav-row">
+  <button id="btn-back" style="visibility: hidden;">&larr; Back</button>
+  <button id="btn-next">Next &rarr;</button>
+</div>
+
+</div>
+
+<!-- ============================================
+     Chart.js library - loaded from CDN
+     If your work laptop blocks CDN, you'll need to
+     download chart.umd.js and reference it locally.
+     ============================================ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<!-- ============================================
+     SCRIPT: all calculations and rendering
+     ============================================ -->
+<script>
+(function(){
+  let step = 0;
+  let chart = null;
+  const panels = document.querySelectorAll('.panel');
+  const pills = document.querySelectorAll('.step-pill');
+  const btnBack = document.getElementById('btn-back');
+  const btnNext = document.getElementById('btn-next');
+
+  // -------- formatting helpers --------
+  const fmt = (n) => {
+    const sign = n < 0 ? '-' : '';
+    const abs = Math.abs(Math.round(n));
+    return sign + '$' + abs.toLocaleString();
+  };
+  const fmtSigned = (n) => (n >= 0 ? '+' : '') + fmt(n);
+  const fmtPct = (n) => (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
+  const val = (id) => parseFloat(document.getElementById(id).value) || 0;
+
+  // -------- THE MATH --------
+  // All bridge calculations live here. If you want to change
+  // how a driver is computed, this is the only place to edit.
+  function compute() {
+    const pySpend = val('py_spend');
+    const cySpend = val('cy_spend');
+    const pyTasks = val('py_tasks');
+    const cyTasks = val('cy_tasks');
+    const pyUnits = val('py_units');
+    const cyUnits = val('cy_units');
+    const laborPct = val('labor_pct') / 100;
+    const laborShare = val('labor_share') / 100;
+    const partsPct = val('parts_pct') / 100;
+    const partsShare = val('parts_share') / 100;
+
+    const totalDelta = cySpend - pySpend;
+    const pyCostPerTask = pyTasks > 0 ? pySpend / pyTasks : 0;
+    const cyCostPerTask = cyTasks > 0 ? cySpend / cyTasks : 0;
+
+    // VOLUME SIDE: hold tasks-per-unit flat at PY rate
+    const pyTasksPerUnit = pyUnits > 0 ? pyTasks / pyUnits : 0;
+    const expectedTasksFromFleet = pyTasksPerUnit * cyUnits;
+    const fleetTaskDelta = expectedTasksFromFleet - pyTasks;       // tasks added by fleet growth alone
+    const controllableTaskDelta = cyTasks - expectedTasksFromFleet; // tasks added beyond fleet growth
+
+    const fleetImpact = fleetTaskDelta * pyCostPerTask;
+    const controllableVolumeImpact = controllableTaskDelta * pyCostPerTask;
+
+    // RATE SIDE: labor and parts inflation applied to CY task volume
+    const laborImpactPerTask = pyCostPerTask * laborShare * laborPct;
+    const partsImpactPerTask = pyCostPerTask * partsShare * partsPct;
+    const laborImpact = laborImpactPerTask * cyTasks;
+    const partsImpact = partsImpactPerTask * cyTasks;
+
+    // RATE RESIDUAL: whatever's left in cost-per-task delta after labor + parts
+    const costPerTaskDelta = cyCostPerTask - pyCostPerTask;
+    const totalRateImpact = costPerTaskDelta * cyTasks;
+    const controllableRateImpact = totalRateImpact - laborImpact - partsImpact;
+
+    return {
+      pySpend, cySpend, totalDelta,
+      pyTasks, cyTasks, pyUnits, cyUnits,
+      pyCostPerTask, cyCostPerTask, costPerTaskDelta,
+      pyTasksPerUnit, expectedTasksFromFleet, fleetTaskDelta, controllableTaskDelta,
+      fleetImpact, controllableVolumeImpact,
+      laborPct, partsPct, laborShare, partsShare,
+      laborImpact, partsImpact, controllableRateImpact, totalRateImpact,
+      uncontrollable: fleetImpact + laborImpact + partsImpact,
+      controllable: controllableVolumeImpact + controllableRateImpact,
+    };
+  }
+
+  // -------- STEP 1 callout --------
+  function updateStep1() {
+    const c = compute();
+    const dir = c.totalDelta >= 0 ? 'increase' : 'decrease';
+    const cptDelta = c.cyCostPerTask - c.pyCostPerTask;
+    document.getElementById('overview-callout').innerHTML =
+      '<div class="label">Total change in spend</div>' +
+      '<div style="font-size: 20px; font-weight: 500; color: ' + (c.totalDelta >= 0 ? 'var(--text-danger)' : 'var(--text-success)') + ';" class="has-tip" data-tip="Current year spend (' + fmt(c.cySpend) + ') minus prior year spend (' + fmt(c.pySpend) + ').">' + fmtSigned(c.totalDelta) + '</div>' +
+      '<div style="margin-top: 6px;">Prior year cost per task: <strong class="has-tip" data-tip="' + fmt(c.pySpend) + ' &divide; ' + c.pyTasks.toLocaleString() + ' tasks">' + fmt(c.pyCostPerTask) + '</strong> &middot; Current year: <strong class="has-tip" data-tip="' + fmt(c.cySpend) + ' &divide; ' + c.cyTasks.toLocaleString() + ' tasks">' + fmt(c.cyCostPerTask) + '</strong> (' + fmtSigned(cptDelta) + ')</div>' +
+      '<div style="margin-top: 4px; color: var(--text-secondary);">Next, we\'ll break this ' + dir + ' into volume drivers (number of tasks) and rate drivers (cost per task).</div>';
+  }
+
+  // -------- STEP 2 callout --------
+  function updateStep2() {
+    const c = compute();
+    document.getElementById('tasks-callout').innerHTML =
+      '<div class="label">Volume-driven spend change</div>' +
+      '<div style="margin-top: 6px;">' +
+        '<div class="driver-row">' +
+          '<div class="name"><span class="tag unctrl">Uncontrol</span> Fleet growth impact</div>' +
+          '<div class="amt has-tip" data-tip="Tasks-per-unit last year (' + c.pyTasksPerUnit.toFixed(2) + ') &times; current units (' + c.cyUnits.toLocaleString() + ') = ' + Math.round(c.expectedTasksFromFleet).toLocaleString() + ' expected tasks. That\'s ' + Math.round(c.fleetTaskDelta).toLocaleString() + ' more than last year, priced at PY cost per task (' + fmt(c.pyCostPerTask) + ').">' + fmtSigned(c.fleetImpact) + '</div>' +
+        '</div>' +
+        '<div class="driver-row">' +
+          '<div class="name"><span class="tag ctrl">Yours</span> Tasks beyond fleet growth</div>' +
+          '<div class="amt has-tip" data-tip="Actual tasks (' + c.cyTasks.toLocaleString() + ') minus expected from fleet growth (' + Math.round(c.expectedTasksFromFleet).toLocaleString() + ') = ' + Math.round(c.controllableTaskDelta).toLocaleString() + ' extra tasks, priced at PY cost per task.">' + fmtSigned(c.controllableVolumeImpact) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top: 8px; color: var(--text-secondary);">If tasks-per-unit had held flat, you\'d expect a <strong>' + fmtSigned(c.fleetImpact) + '</strong> swing just from fleet size. Anything past that - reliability, PM compliance, scope creep - is yours to attack.</div>';
+  }
+
+  // -------- STEP 3 callout --------
+  function updateStep3() {
+    const c = compute();
+    document.getElementById('cost-callout').innerHTML =
+      '<div class="label">Rate-driven spend change</div>' +
+      '<div style="margin-top: 6px;">' +
+        '<div class="driver-row">' +
+          '<div class="name"><span class="tag unctrl">Uncontrol</span> Labor rate change</div>' +
+          '<div class="amt has-tip" data-tip="PY cost per task (' + fmt(c.pyCostPerTask) + ') &times; labor share (' + (c.laborShare*100).toFixed(0) + '%) &times; labor rate change (' + fmtPct(c.laborPct*100) + ') &times; current tasks (' + c.cyTasks.toLocaleString() + ').">' + fmtSigned(c.laborImpact) + '</div>' +
+        '</div>' +
+        '<div class="driver-row">' +
+          '<div class="name"><span class="tag unctrl">Uncontrol</span> Parts price change</div>' +
+          '<div class="amt has-tip" data-tip="PY cost per task (' + fmt(c.pyCostPerTask) + ') &times; parts share (' + (c.partsShare*100).toFixed(0) + '%) &times; parts price change (' + fmtPct(c.partsPct*100) + ') &times; current tasks (' + c.cyTasks.toLocaleString() + ').">' + fmtSigned(c.partsImpact) + '</div>' +
+        '</div>' +
+        '<div class="driver-row">' +
+          '<div class="name"><span class="tag ctrl">Yours</span> Everything else in rate</div>' +
+          '<div class="amt has-tip" data-tip="Total rate impact (' + fmtSigned(c.totalRateImpact) + ') minus labor (' + fmtSigned(c.laborImpact) + ') minus parts (' + fmtSigned(c.partsImpact) + '). Whatever\'s left is parts usage, labor hours, vendor mix, scope, rework, and overhead allocation.">' + fmtSigned(c.controllableRateImpact) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top: 8px; color: var(--text-secondary);">Labor &amp; parts inflation are negotiated upstream. The remainder is where your team moves the needle.</div>';
+  }
+
+  // -------- STEP 4 bridge --------
+  function updateStep4() {
+    const c = compute();
+    const mTotal = document.getElementById('m_total');
+    mTotal.textContent = fmtSigned(c.totalDelta);
+    mTotal.className = 'val has-tip ' + (c.totalDelta >= 0 ? 'pos' : 'neg');
+    mTotal.setAttribute('data-tip', fmt(c.cySpend) + ' - ' + fmt(c.pySpend) + ' = ' + fmtSigned(c.totalDelta));
+
+    const mUncon = document.getElementById('m_uncon');
+    mUncon.textContent = fmtSigned(c.uncontrollable);
+    mUncon.setAttribute('data-tip', 'Fleet (' + fmtSigned(c.fleetImpact) + ') + Labor (' + fmtSigned(c.laborImpact) + ') + Parts (' + fmtSigned(c.partsImpact) + ')');
+
+    const mCtrl = document.getElementById('m_ctrl');
+    mCtrl.textContent = fmtSigned(c.controllable);
+    mCtrl.className = 'val has-tip ' + (c.controllable >= 0 ? 'pos' : 'neg');
+    mCtrl.setAttribute('data-tip', 'Tasks beyond fleet (' + fmtSigned(c.controllableVolumeImpact) + ') + Rate residual (' + fmtSigned(c.controllableRateImpact) + ')');
+
+    document.getElementById('driver-list').innerHTML =
+      '<div class="driver-row"><div class="name"><span class="tag unctrl">Uncontrol</span> Fleet growth</div><div class="amt has-tip" data-tip="Extra tasks from fleet size growth, priced at PY cost per task.">' + fmtSigned(c.fleetImpact) + '</div></div>' +
+      '<div class="driver-row"><div class="name"><span class="tag unctrl">Uncontrol</span> Labor rate</div><div class="amt has-tip" data-tip="Labor inflation applied to labor\'s share of every current-year task.">' + fmtSigned(c.laborImpact) + '</div></div>' +
+      '<div class="driver-row"><div class="name"><span class="tag unctrl">Uncontrol</span> Parts price</div><div class="amt has-tip" data-tip="Parts price inflation applied to parts\' share of every current-year task.">' + fmtSigned(c.partsImpact) + '</div></div>' +
+      '<div class="driver-row"><div class="name"><span class="tag ctrl">Yours</span> Tasks beyond fleet growth</div><div class="amt has-tip" data-tip="Volume increase your team owns - reliability, PM, scope, warranty recovery.">' + fmtSigned(c.controllableVolumeImpact) + '</div></div>' +
+      '<div class="driver-row"><div class="name"><span class="tag ctrl">Yours</span> Everything else in rate</div><div class="amt has-tip" data-tip="Rate residual after labor and parts inflation - usage, efficiency, sourcing, rework, overhead.">' + fmtSigned(c.controllableRateImpact) + '</div></div>';
+
+    drawWaterfall(c);
+  }
+
+  // -------- STEP 5 summary page --------
+  // This is mostly text. Edit the strings below to change
+  // the wording of the executive summary.
+  function updateStep5() {
+    const c = compute();
+    const ctrlPct = (c.controllable / c.totalDelta) * 100;
+    const unconPct = (c.uncontrollable / c.totalDelta) * 100;
+
+    const volumeIsBigger = Math.abs(c.controllableVolumeImpact) > Math.abs(c.controllableRateImpact);
+    const leadLever = volumeIsBigger ? 'volume' : 'rate';
+
+    const volumeActions =
+      '<div class="action-card">' +
+        '<div class="head">&#9881; Reliability &amp; root cause</div>' +
+        '<div class="body">Pull the top failure modes by frequency and cost. Three to five usually drive most of the volume increase. Concentrate fixes there.</div>' +
+      '</div>' +
+      '<div class="action-card">' +
+        '<div class="head">&#9989; PM compliance &amp; intervals</div>' +
+        '<div class="body">Reactive work spawns downstream tasks and costs more per touch. Audit PM completion rates and check whether intervals still fit how the fleet is being used.</div>' +
+      '</div>' +
+      '<div class="action-card">' +
+        '<div class="head">&#128203; Scope and work-order discipline</div>' +
+        '<div class="body">Sometimes "more tasks" is the same work split across more tickets. Compare actual scope to standard job plans on your highest-volume task types.</div>' +
+      '</div>' +
+      '<div class="action-card">' +
+        '<div class="head">&#128737; Warranty &amp; vendor recovery</div>' +
+        '<div class="body">Make sure tasks that should be covered under warranty or vendor remediation aren\'t quietly being absorbed into your spend.</div>' +
+      '</div>';
+
+    const rateActions =
+      '<div class="action-card">' +
+        '<div class="head">&#9201; Labor hours per task</div>' +
+        '<div class="body">If actuals are drifting above standards, either the standards are stale or execution is slipping. Audit your highest-volume task types and find the biggest gaps.</div>' +
+      '</div>' +
+      '<div class="action-card">' +
+        '<div class="head">&#128230; Parts usage per task</div>' +
+        '<div class="body">Different from parts price. Look for over-ordering, premium-where-standard-would-do, and replace-vs-repair decisions on high-value components.</div>' +
+      '</div>' +
+      '<div class="action-card">' +
+        '<div class="head">&#128666; Vendor mix &amp; sourcing</div>' +
+        '<div class="body">Shift volume toward lower-cost qualified vendors, consolidate spend for better terms, and revisit make-vs-buy on selected work.</div>' +
+      '</div>' +
+      '<div class="action-card">' +
+        '<div class="head">&#128260; First-time-fix rate</div>' +
+        '<div class="body">Rework effectively doubles the cost of a task. Track callbacks and repeat visits, and target the work types with the worst rates.</div>' +
+      '</div>';
+
+    document.getElementById('summary-content').innerHTML =
+      '<p style="font-size: 14px; margin: 0 0 16px;">Here\'s the executive summary of your bridge and what to do about it.</p>' +
+      '<div class="summary-section">' +
+        '<h3>The headline</h3>' +
+        '<p>Total YoY spend changed by <strong style="color: ' + (c.totalDelta >= 0 ? 'var(--text-danger)' : 'var(--text-success)') + ';">' + fmtSigned(c.totalDelta) + '</strong>. Of that, <strong>' + fmtSigned(c.uncontrollable) + '</strong> is outside your team\'s control (fleet growth, labor inflation, parts inflation) and <strong>' + fmtSigned(c.controllable) + '</strong> is in your bucket to go after.</p>' +
+      '</div>' +
+      '<div class="summary-section">' +
+        '<h3>What that means</h3>' +
+        '<p>Roughly <strong>' + (isFinite(ctrlPct) ? Math.round(ctrlPct) : 0) + '%</strong> of the gap is yours to influence. The remaining <strong>' + (isFinite(unconPct) ? Math.round(unconPct) : 0) + '%</strong> would have happened regardless of how well your team executed. When framing this to leadership, that\'s the distinction that matters - you\'re not on the hook for the full ' + fmtSigned(c.totalDelta) + ' swing, but you do own the ' + fmtSigned(c.controllable) + '.</p>' +
+        '<p>Your controllable bucket splits into <strong>' + fmtSigned(c.controllableVolumeImpact) + '</strong> from volume (more tasks than fleet growth alone explains) and <strong>' + fmtSigned(c.controllableRateImpact) + '</strong> from rate (cost per task moving beyond labor and parts inflation). Volume levers tend to take quarters to move; rate levers can show results faster.</p>' +
+      '</div>' +
+      '<div class="summary-section">' +
+        '<h3>Where to lead</h3>' +
+        '<p>The <strong>' + leadLever + '</strong> bucket is the bigger driver of your controllable spend, so I\'d sequence work there first. Below are the highest-leverage plays for each.</p>' +
+        '<div style="margin-top: 12px;">' +
+          '<div style="font-size: 13px; font-weight: 500; margin-bottom: 8px;"><span class="tag ctrl">Volume plays</span> for tasks beyond fleet growth</div>' +
+          volumeActions +
+        '</div>' +
+        '<div style="margin-top: 16px;">' +
+          '<div style="font-size: 13px; font-weight: 500; margin-bottom: 8px;"><span class="tag ctrl">Rate plays</span> for everything else in cost per task</div>' +
+          rateActions +
+        '</div>' +
+      '</div>' +
+      '<div class="summary-section">' +
+        '<h3>How to brief leadership</h3>' +
+        '<p>Lead with the split: total gap, uncontrollable portion, your bucket. Show the waterfall so the decomposition is visible. Then commit to a recovery target on the controllable portion - not the whole gap - with a sequenced plan tied to the bigger of your two buckets (volume or rate).</p>' +
+      '</div>';
+  }
+
+  // -------- Waterfall chart drawing --------
+  // To change colors, edit the colors.push() lines below
+  // or change --color-controllable / --color-uncontrollable in the :root CSS.
+  function drawWaterfall(c) {
+    const py = c.pySpend / 1e6;
+    const cy = c.cySpend / 1e6;
+    const drivers = [
+      { name: 'Fleet growth', amt: c.fleetImpact / 1e6, kind: 'u' },
+      { name: 'Labor rate', amt: c.laborImpact / 1e6, kind: 'u' },
+      { name: 'Parts price', amt: c.partsImpact / 1e6, kind: 'u' },
+      { name: 'Tasks beyond fleet', amt: c.controllableVolumeImpact / 1e6, kind: 'c' },
+      { name: 'Rate (other)', amt: c.controllableRateImpact / 1e6, kind: 'c' },
+    ];
+
+    const labels = ['PY spend'].concat(drivers.map(d => d.name)).concat(['CY spend']);
+    const floating = [];
+    const colors = [];
+    let running = py;
+    floating.push([0, py]);
+    colors.push('#888780');                    // PY total - gray
+    drivers.forEach(d => {
+      const start = running;
+      const end = running + d.amt;
+      floating.push([Math.min(start, end), Math.max(start, end)]);
+      colors.push(d.kind === 'u' ? '#BA7517' : '#378ADD');  // amber or blue
+      running = end;
+    });
+    floating.push([0, cy]);
+    colors.push('#888780');                    // CY total - gray
+
+    if (chart) chart.destroy();
+    const ctx = document.getElementById('waterfall').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: floating,
+          backgroundColor: colors,
+          borderColor: colors,
+          borderWidth: 0,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const idx = ctx.dataIndex;
+                if (idx === 0) return 'PY: $' + py.toFixed(2) + 'M';
+                if (idx === labels.length - 1) return 'CY: $' + cy.toFixed(2) + 'M';
+                const d = drivers[idx - 1];
+                const sign = d.amt >= 0 ? '+' : '';
+                return d.name + ': ' + sign + '$' + d.amt.toFixed(2) + 'M';
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { autoSkip: false, maxRotation: 35, minRotation: 35, font: { size: 11 } }, grid: { display: false } },
+          y: { ticks: { callback: (v) => '$' + v + 'M', font: { size: 11 } }, grid: { color: 'rgba(127,127,127,0.15)' } },
+        },
+      },
+    });
+  }
+
+  // -------- step navigation --------
+  function render() {
+    panels.forEach((p, i) => p.classList.toggle('active', i === step));
+    pills.forEach((p, i) => {
+      p.classList.toggle('active', i === step);
+      p.classList.toggle('done', i < step);
+    });
+    btnBack.style.visibility = step === 0 ? 'hidden' : 'visible';
+    btnNext.textContent = step === 4 ? 'Restart \u21BA' : 'Next \u2192';
+
+    if (step === 0) updateStep1();
+    if (step === 1) updateStep2();
+    if (step === 2) updateStep3();
+    if (step === 3) updateStep4();
+    if (step === 4) updateStep5();
+  }
+
+  btnNext.addEventListener('click', () => {
+    if (step === 4) { step = 0; } else { step++; }
+    render();
+  });
+  btnBack.addEventListener('click', () => { if (step > 0) step--; render(); });
+
+  // recompute on any input change
+  document.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      if (step === 0) updateStep1();
+      if (step === 1) updateStep2();
+      if (step === 2) updateStep3();
+      if (step === 3) updateStep4();
+      if (step === 4) updateStep5();
+    });
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
